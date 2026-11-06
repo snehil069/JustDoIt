@@ -1,16 +1,6 @@
 import React from 'react';
 import { UserProgress, Category } from '@shared/types/index';
-import {
-  TrendingUp,
-  Award,
-  Flame,
-  Clock,
-  Target,
-  BarChart3,
-  CheckCircle2,
-  AlertTriangle,
-  Zap,
-} from 'lucide-react';
+import { TrendingUp, BarChart3, ArrowLeft } from 'lucide-react';
 
 interface ProgressViewProps {
   progress: UserProgress;
@@ -39,103 +29,116 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ progress, onNavigate
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn pb-16">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Progress & Learning Analytics
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Metrics calculated strictly from verified session recordings and calibrated evaluations.
-        </p>
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
+      {/* Header Bar */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={onNavigateHome}
+            className="flex items-center space-x-2 text-xs font-medium text-[#252525] hover:text-[#666666] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Dashboard</span>
+          </button>
+          <div className="h-4 w-[1px] bg-[#E5E5E5] hidden sm:block"></div>
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-semibold tracking-tight text-[#252525]">SpeakUp</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#929292] border border-[#E5E5E5] px-1.5 py-0.5 rounded">
+              Performance Ledger
+            </span>
+          </div>
+        </div>
+
+        <div className="font-mono text-xs text-[#666666]">
+          Cumulative Articulation: {formatTime(progress.totalSpeakingTimeSec)}
+        </div>
       </div>
 
-      {/* Top Stats */}
+      {/* Top 4 Metrics Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-          <span className="text-xs font-semibold uppercase text-slate-400">Total Sessions</span>
-          <div className="text-3xl font-extrabold text-slate-900 dark:text-white">
+        <div className="bg-[#FFFFFF] p-5 rounded-lg border border-[#E5E5E5] space-y-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Total Sessions</span>
+          <div className="text-3xl font-light font-mono text-[#252525]">
             {progress.totalSessions}
           </div>
-          <span className="text-[11px] text-slate-500">Evaluated speeches</span>
+          <span className="text-xs text-[#666666] block">Verified speech evaluations</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-          <span className="text-xs font-semibold uppercase text-slate-400">Speaking Time</span>
-          <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
+        <div className="bg-[#FFFFFF] p-5 rounded-lg border border-[#E5E5E5] space-y-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Speaking Time</span>
+          <div className="text-3xl font-light font-mono text-[#252525]">
             {formatTime(progress.totalSpeakingTimeSec)}
           </div>
-          <span className="text-[11px] text-slate-500">Total active microphone time</span>
+          <span className="text-xs text-[#666666] block">Active microphone signal</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-          <span className="text-xs font-semibold uppercase text-slate-400">Average Score</span>
-          <div className="text-3xl font-extrabold text-brand-600 dark:text-brand-400 flex items-center gap-1 font-mono">
-            {progress.averageScore > 0 ? progress.averageScore : '--'}
-            <span className="text-sm font-normal text-slate-400">/100</span>
+        <div className="bg-[#FFFFFF] p-5 rounded-lg border border-[#E5E5E5] space-y-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Average Score</span>
+          <div className="text-3xl font-light font-mono text-[#252525] flex items-baseline space-x-1">
+            <span>{progress.averageScore > 0 ? progress.averageScore : '--'}</span>
+            <span className="text-xs font-normal text-[#929292]">/100</span>
           </div>
-          <span className="text-[11px] text-slate-500">Calibrated rubric score</span>
+          <span className="text-xs text-[#666666] block">7-dimension rubric mean</span>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-          <span className="text-xs font-semibold uppercase text-slate-400">Current Streak</span>
-          <div className="text-3xl font-extrabold text-amber-500 flex items-center gap-1.5">
-            {progress.currentStreakDays} <span className="text-sm font-normal text-slate-400">days</span>
+        <div className="bg-[#FFFFFF] p-5 rounded-lg border border-[#E5E5E5] space-y-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Current Streak</span>
+          <div className="text-3xl font-light font-mono text-[#252525] flex items-baseline space-x-1">
+            <span>{progress.currentStreakDays}</span>
+            <span className="text-xs font-normal text-[#929292]">days</span>
           </div>
-          <span className="text-[11px] text-slate-500">Daily practice habit</span>
+          <span className="text-xs text-[#666666] block">Daily practice cadence</span>
         </div>
       </div>
 
-      {/* Score Trend Timeline */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+      {/* Score History & Trend */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-brand-600" />
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              Score History & Trend
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-semibold text-[#252525] tracking-tight">
+              Score History & Dialectical Trend
             </h3>
+            <span className="text-xs text-[#666666]">Chronological progression across completed sessions</span>
           </div>
-          <span className="text-xs text-slate-400">Recent Sessions</span>
+          <span className="font-mono text-xs text-[#929292]">Standardized Scale 0–100</span>
         </div>
 
         {progress.scoreTrend.length > 0 ? (
           <div className="space-y-3">
-            <div className="h-44 flex items-end gap-2 pt-6 pb-2 px-2 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
+            <div className="h-44 flex items-end gap-2 pt-6 pb-2 px-2 border-b border-[#E5E5E5] overflow-x-auto">
               {progress.scoreTrend.map((item, i) => (
                 <div key={i} className="flex-1 min-w-[36px] flex flex-col items-center gap-1.5 h-full justify-end group">
-                  <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-[10px] font-mono text-[#252525] opacity-0 group-hover:opacity-100 transition-opacity">
                     {item.score}
                   </span>
                   <div
-                    className={`w-full max-w-[28px] rounded-t-lg transition-all ${
-                      item.score >= 80 ? 'bg-emerald-500' : item.score >= 60 ? 'bg-brand-500' : 'bg-amber-500'
-                    }`}
+                    className="w-full max-w-[24px] rounded-t bg-[#252525] group-hover:bg-[#3f3f3f] transition-all"
                     style={{ height: `${Math.max(12, item.score)}%` }}
                   />
-                  <span className="text-[10px] text-slate-400 truncate w-full text-center">
+                  <span className="text-[10px] text-[#929292] font-mono truncate w-full text-center">
                     {item.date}
                   </span>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-slate-500 text-center italic">
-              Scores reflect genuine rubric performance. Consistency over weeks leads to measurable leaps in clarity.
+            <p className="text-xs text-[#666666] text-center pt-1 leading-relaxed">
+              Scores reflect calibrated rubric evaluations. Weekly endurance building drives progressive structural clarity.
             </p>
           </div>
         ) : (
-          <div className="p-8 text-center bg-slate-50 dark:bg-slate-850 rounded-xl text-xs text-slate-400 italic">
-            Complete your first speaking session to start mapping your communication score trend.
+          <div className="p-8 text-center bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] text-xs text-[#929292] font-mono">
+            Complete your first speaking session to map your performance trend line.
           </div>
         )}
       </div>
 
       {/* Category Performance Breakdown */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-indigo-500" />
-          <h3 className="font-bold text-slate-900 dark:text-white text-base">
-            Category Practice Breakdown
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-semibold text-[#252525] tracking-tight">
+            Curriculum Category Breakdown
           </h3>
+          <span className="text-xs text-[#666666]">Granular performance records across 10 subject domains</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -144,21 +147,21 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ progress, onNavigate
             return (
               <div
                 key={cat.id}
-                className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between"
+                className="p-4 rounded-lg bg-[#FFFFFF] border border-[#E5E5E5] flex items-center justify-between hover:border-[#252525] transition-colors"
               >
                 <div>
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span className="text-xs font-medium text-[#252525] block">
                     {cat.label}
                   </span>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
+                  <span className="text-[11px] text-[#666666] font-mono mt-0.5 block">
                     {data.completed} completed
-                  </div>
+                  </span>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                  <div className="text-sm font-medium font-mono text-[#252525]">
                     {data.avgScore > 0 ? `${data.avgScore}/100` : '--'}
                   </div>
-                  <span className="text-[10px] text-slate-400">Avg score</span>
+                  <span className="text-[10px] text-[#929292] font-mono">Avg Score</span>
                 </div>
               </div>
             );

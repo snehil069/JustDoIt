@@ -3,18 +3,14 @@ import { ProviderSettings } from '@shared/types/index';
 import { storageService } from '../../services/storage';
 import { api } from '../../services/api';
 import {
-  Settings,
-  Key,
-  Shield,
-  Volume2,
   Trash2,
   CheckCircle2,
-  AlertTriangle,
   Eye,
   EyeOff,
   Cpu,
   Mic,
   Save,
+  Shield,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -29,7 +25,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [form, setForm] = useState<ProviderSettings>({ ...settings });
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
-  const [showGrokKey, setShowGrokKey] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -37,7 +32,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const updated = storageService.saveSettings(form);
     onUpdateSettings(updated);
 
-    // Sync keys with backend server runtime
     try {
       await api.updateServerSettings({
         geminiApiKey: form.geminiApiKey,
@@ -55,79 +49,91 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleClearData = () => {
-    if (confirm('Are you sure you want to delete all saved practice sessions and progress? This cannot be undone.')) {
+    if (confirm('Permanently delete all saved practice sessions and progress? This cannot be undone.')) {
       storageService.clearAllData();
-      alert('All local sessions and progress have been deleted.');
       window.location.reload();
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 animate-fadeIn pb-16">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Application & Provider Settings
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Configure external AI models, real-time speech providers, and local privacy preferences.
-        </p>
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
+      {/* Header Banner */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">System Configuration</span>
+            <span className="text-[#E5E5E5]">•</span>
+            <span className="text-xs text-[#666666]">API Engines & Privacy Controls</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
+            Provider & Diagnostic Settings
+          </h1>
+          <p className="text-xs sm:text-sm text-[#666666] max-w-2xl leading-relaxed pt-1">
+            Manage your AI evaluation key, live speech-to-text pipeline, and client-side storage policies.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2 font-mono text-xs text-[#929292] border border-[#E5E5E5] px-3 py-1.5 rounded-lg bg-[#F5F5F4] self-start md:self-auto">
+          <span>Storage: Browser LocalStorage</span>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* AI Provider Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-brand-600" />
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              AI Reasoning & Evaluation Engine
+        {/* 1. AI Reasoning Engine Card */}
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
+          <div className="flex items-center space-x-2">
+            <Cpu className="w-4 h-4 text-[#252525]" />
+            <h2 className="text-sm font-semibold text-[#252525] uppercase tracking-wider font-mono">
+              AI Evaluation & Synthesis Engine
             </h2>
           </div>
 
-          <p className="text-xs text-slate-500 leading-relaxed">
-            SpeakUp supports <strong>Google Gemini</strong> for topic synthesis, debate arguments, and calibrated speech evaluation. When no key is entered, SpeakUp operates in verified <strong>Demo Mode</strong>.
+          <p className="text-xs text-[#666666] leading-relaxed">
+            SpeakUp natively connects to <strong>Google Gemini</strong> for real-time generative feedback, dialectical scrutiny, and topic generation. When unconfigured, the application runs on calibrated <strong>Demo Mode</strong> with local heuristic analysis.
           </p>
 
-          {/* Gemini API Key */}
+          {/* Gemini Key */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-              <span>Google Gemini API Key</span>
+            <div className="flex items-center justify-between text-xs">
+              <label className="font-medium text-[#252525]">
+                Google Gemini API Key
+              </label>
               <a
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noreferrer"
-                className="text-brand-600 hover:underline text-[11px]"
+                className="text-[#252525] underline hover:text-[#666666] font-mono text-[11px]"
               >
-                Get free Gemini API key →
+                Get Gemini API key →
               </a>
-            </label>
+            </div>
             <div className="relative">
               <input
                 type={showGeminiKey ? 'text' : 'password'}
                 value={form.geminiApiKey}
                 onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}
                 placeholder="AIzaSy..."
-                className="w-full py-2.5 px-3 pr-10 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                className="w-full py-2.5 px-3 pr-10 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
               />
               <button
                 type="button"
                 onClick={() => setShowGeminiKey(!showGeminiKey)}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-2.5 text-[#929292] hover:text-[#252525]"
               >
                 {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
-          {/* Demo Mode Toggle */}
-          <div className="flex items-center justify-between pt-2">
+          {/* Demo Mode Switch */}
+          <div className="flex items-center justify-between pt-3 border-t border-[#E5E5E5]">
             <div>
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="text-xs font-medium text-[#252525] block">
                 Operate in Demo Mode
               </span>
-              <p className="text-[11px] text-slate-500">
-                Uses local rule-based heuristic evaluator with zero external API calls.
-              </p>
+              <span className="text-[11px] text-[#666666] block">
+                Force local rule-based heuristic evaluator without sending requests to external APIs.
+              </span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -136,84 +142,100 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setForm({ ...form, isDemoMode: e.target.checked })}
                 className="sr-only peer"
               />
-              <div className="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+              <div className="w-9 h-5 bg-[#E5E5E5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#252525]"></div>
             </label>
           </div>
         </div>
 
-        {/* Speech-to-Text Provider Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-          <div className="flex items-center gap-2">
-            <Mic className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+        {/* 2. STT Provider Section */}
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
+          <div className="flex items-center space-x-2">
+            <Mic className="w-4 h-4 text-[#252525]" />
+            <h2 className="text-sm font-semibold text-[#252525] uppercase tracking-wider font-mono">
               Speech-to-Text (STT) Provider
             </h2>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Transcription Provider
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-[#252525] block">
+              Active Transcription Engine
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div
                 onClick={() => setForm({ ...form, preferredSttProvider: 'browser-webspeech' })}
-                className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                className={`p-4 rounded-lg border cursor-pointer transition-all space-y-1 ${
                   form.preferredSttProvider === 'browser-webspeech'
-                    ? 'bg-brand-50 dark:bg-brand-950/40 border-brand-500'
-                    : 'bg-slate-50 dark:bg-slate-850 border-slate-200/60 dark:border-slate-800'
+                    ? 'bg-[#F5F5F4] border-[#252525]'
+                    : 'bg-[#FFFFFF] border-[#E5E5E5] hover:border-[#252525]'
                 }`}
               >
-                <span className="font-bold text-xs text-slate-900 dark:text-white">
-                  Browser Web Speech API
-                </span>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Built-in zero-config speech recognition in Chrome, Edge, and Brave. Zero setup required.
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-xs text-[#252525]">
+                    Browser Web Speech API
+                  </span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      form.preferredSttProvider === 'browser-webspeech' ? 'bg-[#252525]' : 'bg-[#E5E5E5]'
+                    }`}
+                  />
+                </div>
+                <p className="text-[11px] text-[#666666] leading-relaxed">
+                  Native speech recognition in Chrome, Edge, and Brave. Zero setup required.
                 </p>
               </div>
 
               <div
                 onClick={() => setForm({ ...form, preferredSttProvider: 'deepgram' })}
-                className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                className={`p-4 rounded-lg border cursor-pointer transition-all space-y-1 ${
                   form.preferredSttProvider === 'deepgram'
-                    ? 'bg-brand-50 dark:bg-brand-950/40 border-brand-500'
-                    : 'bg-slate-50 dark:bg-slate-850 border-slate-200/60 dark:border-slate-800'
+                    ? 'bg-[#F5F5F4] border-[#252525]'
+                    : 'bg-[#FFFFFF] border-[#E5E5E5] hover:border-[#252525]'
                 }`}
               >
-                <span className="font-bold text-xs text-slate-900 dark:text-white">
-                  Deepgram Nova-2 Live
-                </span>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  High-accuracy model tuned for Indian English accents and technical vocabulary.
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-xs text-[#252525]">
+                    Deepgram Nova-2 Live WebSocket
+                  </span>
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      form.preferredSttProvider === 'deepgram' ? 'bg-[#252525]' : 'bg-[#E5E5E5]'
+                    }`}
+                  />
+                </div>
+                <p className="text-[11px] text-[#666666] leading-relaxed">
+                  Real-time streaming speech recognition with high accuracy and filler word detection.
                 </p>
               </div>
             </div>
           </div>
 
           {form.preferredSttProvider === 'deepgram' && (
-            <div className="space-y-1.5 animate-fadeIn">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                <span>Deepgram API Key</span>
+            <div className="space-y-1.5 animate-fadeIn pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <label className="font-medium text-[#252525]">
+                  Deepgram API Key
+                </label>
                 <a
                   href="https://console.deepgram.com"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-brand-600 hover:underline text-[11px]"
+                  className="text-[#252525] underline hover:text-[#666666] font-mono text-[11px]"
                 >
-                  Get Deepgram API Key →
+                  Deepgram Console →
                 </a>
-              </label>
+              </div>
               <div className="relative">
                 <input
                   type={showDeepgramKey ? 'text' : 'password'}
                   value={form.deepgramApiKey}
                   onChange={(e) => setForm({ ...form, deepgramApiKey: e.target.value })}
-                  placeholder="Deepgram token..."
-                  className="w-full py-2.5 px-3 pr-10 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  placeholder="Deepgram key..."
+                  className="w-full py-2.5 px-3 pr-10 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowDeepgramKey(!showDeepgramKey)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-2.5 text-[#929292] hover:text-[#252525]"
                 >
                   {showDeepgramKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -222,23 +244,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
 
-        {/* Audio Retention & Privacy */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Privacy & Local Storage
+        {/* 3. Audio Retention & Data Management */}
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
+          <div className="flex items-center space-x-2">
+            <Shield className="w-4 h-4 text-[#252525]" />
+            <h2 className="text-sm font-semibold text-[#252525] uppercase tracking-wider font-mono">
+              Privacy & Local Data Management
             </h2>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="text-xs font-medium text-[#252525] block">
                 Retain Audio Recordings for Playback
               </span>
-              <p className="text-[11px] text-slate-500">
-                When enabled, your audio blob is kept in browser memory so you can listen back to your speech.
-              </p>
+              <span className="text-[11px] text-[#666666] block">
+                Preserve spoken audio blobs in browser memory so you can listen back to your speech on the report.
+              </span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -247,34 +269,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setForm({ ...form, retainAudioRecordings: e.target.checked })}
                 className="sr-only peer"
               />
-              <div className="w-10 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+              <div className="w-9 h-5 bg-[#E5E5E5] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#252525]"></div>
             </label>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-xs text-rose-600 font-medium">Danger Zone</span>
+          <div className="pt-4 border-t border-[#E5E5E5] flex items-center justify-between">
+            <div className="text-xs text-[#666666]">
+              Clear cached transcripts and scores
+            </div>
             <button
               type="button"
               onClick={handleClearData}
-              className="px-3.5 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-3.5 py-1.5 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F4] text-[#252525] text-xs font-medium flex items-center space-x-1.5 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear All History & Data</span>
+              <span>Clear Local Data</span>
             </button>
           </div>
         </div>
 
-        {/* Save Bar */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        {/* Action Button Bar */}
+        <div className="flex items-center justify-end space-x-4 pt-2">
           {saveSuccess && (
-            <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+            <span className="text-xs font-medium text-[#252525] flex items-center space-x-1 font-mono">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Settings saved!</span>
+              <span>Configuration successfully saved</span>
             </span>
           )}
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+            className="px-6 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
           >
             <Save className="w-4 h-4" />
             <span>Save Settings</span>

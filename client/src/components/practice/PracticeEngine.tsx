@@ -20,11 +20,10 @@ import {
   Clock,
   Volume2,
   FileText,
-  CheckCircle,
-  HelpCircle,
   Lightbulb,
   ArrowRight,
   ShieldAlert,
+  X,
 } from 'lucide-react';
 
 interface PracticeEngineProps {
@@ -74,7 +73,6 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
     startListening,
     stopListening,
     resetTranscript,
-    setFinalTranscript,
   } = useSpeechRecognition();
 
   // Timestamp-based drift-free timer
@@ -83,28 +81,28 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   const latestAudioAnalysisRef = useRef<AudioAnalysisOutput | null>(null);
   const currentSessionIdRef = useRef<string>(`session-${Date.now()}`);
 
-  // Duration options in seconds
   const durationOptions = [60, 120, 180, 300, 600];
 
   useEffect(() => {
     setRemainingSec(selectedDurationSec);
   }, [selectedDurationSec]);
 
-  // Clean up timer on unmount
   useEffect(() => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
 
-  // Format MM:SS
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Start speaking session
+  const wordCount = fullTranscript.trim().split(/\s+/).filter(Boolean).length;
+  const currentWpm = elapsedSec > 4 ? Math.round((wordCount / elapsedSec) * 60) : 0;
+  const fillerCount = (fullTranscript.match(/\b(um|uh|erm|like|you know|basically|actually)\b/gi) || []).length;
+
   const handleStartRecording = async () => {
     setErrorMessage(null);
     resetTranscript();
@@ -137,7 +135,6 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
     }, 250);
   };
 
-  // Stop recording
   const handleStopRecording = useCallback(async () => {
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -152,14 +149,13 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
     await executeEvaluation(audioAnalysis);
   }, [stopListening, stopRecording]);
 
-  // Execute Evaluation
   const executeEvaluation = async (audioAnalysis?: AudioAnalysisOutput | null) => {
     const transcriptToEvaluate = fullTranscript.trim();
 
     if (!transcriptToEvaluate) {
       setSessionState('error');
       setErrorMessage(
-        'No speech was captured. Please ensure your microphone is working, speaks clearly, and try recording again.'
+        'No speech was captured. Please ensure your microphone is working, speak clearly, and try recording again.'
       );
       return;
     }
@@ -221,266 +217,285 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   const timerProgress = selectedDurationSec > 0 ? (elapsedSec / selectedDurationSec) * 100 : 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn pb-16">
-      {/* Topic Card Banner */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 text-xs font-semibold uppercase tracking-wider">
-              {topic.category.replace('-', ' ')}
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-medium capitalize">
-              {topic.difficulty} Difficulty
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-medium capitalize">
-              {topic.format.replace('-', ' ')}
-            </span>
-          </div>
-
-          {sessionState === 'topic_ready' && onSkipTopic && (
-            <button
-              onClick={onSkipTopic}
-              className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline"
-            >
-              Skip this topic
-            </button>
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug">
-            {topic.title}
-          </h2>
-          <p className="mt-3 text-base sm:text-lg text-slate-700 dark:text-slate-200 font-medium leading-relaxed bg-slate-50 dark:bg-slate-850 p-4 rounded-xl border border-slate-200/60 dark:border-slate-800">
-            {topic.question}
-          </p>
-        </div>
-
-        {topic.taskExplanation && (
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 italic">
-            Coach Tip: {topic.taskExplanation}
-          </p>
-        )}
-
-        {/* Hints accordion */}
-        {topic.hints && topic.hints.length > 0 && (
-          <div className="pt-2">
-            <button
-              onClick={() => setShowHints(!showHints)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline"
-            >
-              <Lightbulb className="w-3.5 h-3.5" />
-              <span>{showHints ? 'Hide Speaking Angles' : 'Need Ideas? View Angles'}</span>
-            </button>
-
-            {showHints && (
-              <ul className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-brand-50/50 dark:bg-brand-950/20 rounded-xl border border-brand-100 dark:border-brand-900/40 text-xs text-slate-600 dark:text-slate-300 animate-fadeIn">
-                {topic.hints.map((hint, idx) => (
-                  <li key={idx} className="flex items-start gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-500 mt-1 flex-shrink-0" />
-                    <span>{hint}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Speaking Timer & Waveform Controls */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-        {/* Duration selector when idle */}
-        {sessionState === 'topic_ready' && (
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              <Clock className="w-4 h-4 text-brand-500" />
-              <span>Target Duration</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {durationOptions.map((sec) => (
-                <button
-                  key={sec}
-                  onClick={() => setSelectedDurationSec(sec)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    selectedDurationSec === sec
-                      ? 'bg-brand-600 text-white font-bold shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  {sec >= 60 ? `${sec / 60}m` : `${sec}s`}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Live Timer Display */}
-        <div className="flex flex-col items-center justify-center space-y-3 py-2">
-          <div className="relative flex items-center justify-center">
-            {/* Countdown / Elapsed Big Numbers */}
-            <div className="text-center">
-              <span
-                className={`text-5xl sm:text-6xl font-extrabold tracking-tight font-mono ${
-                  sessionState === 'recording'
-                    ? remainingSec < 30
-                      ? 'text-rose-600 dark:text-rose-400 animate-pulse'
-                      : 'text-slate-900 dark:text-white'
-                    : 'text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                {sessionState === 'recording' ? formatTime(remainingSec) : formatTime(selectedDurationSec)}
-              </span>
-              <p className="text-xs text-slate-400 mt-1 uppercase font-semibold tracking-wider">
-                {sessionState === 'recording' ? 'Remaining' : 'Target Speaking Duration'}
-              </p>
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          {sessionState === 'recording' && (
-            <div className="w-full max-w-md h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand-600 transition-all duration-300 rounded-full"
-                style={{ width: `${Math.min(100, timerProgress)}%` }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Waveform Visualizer */}
-        <WaveformVisualizer isRecording={isRecording} volume={currentVolume} />
-
-        {/* Action Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-          {sessionState === 'topic_ready' && (
-            <>
-              <button
-                onClick={handleStartRecording}
-                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <Mic className="w-4 h-4" />
-                <span>Start Speaking</span>
-              </button>
-              <button
-                onClick={onCancel}
-                className="w-full sm:w-auto px-5 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            </>
-          )}
-
-          {sessionState === 'recording' && (
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <button
-                onClick={handleStopRecording}
-                className="flex-1 sm:flex-initial px-8 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <Square className="w-4 h-4 fill-white" />
-                <span>Finish & Analyze Response</span>
-              </button>
-            </div>
-          )}
-
-          {sessionState === 'error' && (
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <button
-                onClick={() => executeEvaluation(latestAudioAnalysisRef.current)}
-                className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm shadow-md flex items-center gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Retry Evaluation</span>
-              </button>
-              <button
-                onClick={() => setSessionState('topic_ready')}
-                className="px-5 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium"
-              >
-                Start Over
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Processing State Indicator */}
-        {sessionState === 'processing' && (
-          <div className="p-6 bg-slate-50 dark:bg-slate-850 rounded-xl border border-slate-200 dark:border-slate-800 text-center space-y-4 animate-pulse">
-            <div className="inline-flex p-3 rounded-full bg-brand-100 dark:bg-brand-900/50 text-brand-600">
-              <Sparkles className="w-6 h-6 animate-spin" />
-            </div>
-            <div>
-              <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                Evaluating Your Speech
-              </h4>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Running signal analysis, checking reasoning integrity, detecting filler words, and
-                compiling exact grammatical corrections...
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Error notification banner */}
-        {errorMessage && (
-          <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl flex items-start gap-3 text-rose-800 dark:text-rose-200 text-xs leading-relaxed">
-            <AlertCircle className="w-4 h-4 mt-0.5 text-rose-600 flex-shrink-0" />
-            <div>
-              <p className="font-semibold">Notice</p>
-              <p className="mt-0.5">{errorMessage}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Mic Permission Warning */}
-        {micPermissionDenied && (
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-start gap-3 text-amber-800 dark:text-amber-200 text-xs">
-            <ShieldAlert className="w-4 h-4 mt-0.5 text-amber-600 flex-shrink-0" />
-            <div>
-              <p className="font-bold">Microphone Permission Required</p>
-              <p className="mt-0.5">
-                Please click the microphone/lock icon in your browser URL bar and choose "Allow" to enable live speech recording.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Live Verbatim Transcription Box */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-brand-500" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Live Verbatim Transcript
-            </h3>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            {fullTranscript.split(/\s+/).filter(Boolean).length} words captured
+    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fadeIn pb-16">
+      {/* Minimal Top Header Context */}
+      <div className="flex items-center justify-between pb-2 border-b border-[#E5E5E5] text-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#252525]" />
+          <span className="font-medium text-[#666666] capitalize">
+            {topic.category.replace('-', ' ')} · {topic.difficulty} Difficulty
           </span>
         </div>
 
-        <div className="min-h-[120px] max-h-[220px] overflow-y-auto p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-          {finalTranscript && <span>{finalTranscript}</span>}
-          {interimText && <span className="text-brand-500 font-medium italic"> {interimText}</span>}
-          {!finalTranscript && !interimText && (
-            <span className="text-slate-400 italic">
-              {sessionState === 'recording'
-                ? 'Listening... Speak clearly into your microphone.'
-                : 'Your speech transcript will appear here in real-time as you speak.'}
-            </span>
-          )}
-        </div>
-
-        <p className="text-[11px] text-slate-400 italic">
-          Note: Fillers and hesitations ("um", "like", false starts) are intentionally preserved to ensure accurate, honest fluency feedback.
-        </p>
+        <button
+          onClick={onCancel}
+          className="text-[#666666] hover:text-[#252525] flex items-center gap-1 transition-colors"
+        >
+          <span>Exit Session</span>
+          <span className="font-mono text-[10px] text-[#929292] border border-[#E5E5E5] px-1 py-0.5 rounded">
+            Esc
+          </span>
+        </button>
       </div>
 
-      {/* Audio Playback when recording is stopped */}
+      {/* Primary Focused Session Card (Google Stitch Design) */}
+      <div className="bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg p-6 sm:p-9 shadow-none flex flex-col gap-7">
+        {/* Status & Target Bar */}
+        <section className="flex flex-col gap-4 border-b border-[#E5E5E5] pb-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Mic Status */}
+            <div className="flex items-center gap-2.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  sessionState === 'recording' ? 'bg-[#252525] pulse-dot' : 'bg-[#929292]'
+                }`}
+              />
+              <span className="text-xs font-semibold tracking-tight text-[#252525]">
+                {sessionState === 'recording'
+                  ? 'Recording · Microphone Active'
+                  : 'Ready to Record'}
+              </span>
+              <span className="text-[#E5E5E5]">|</span>
+              <span className="text-[11px] font-mono text-[#666666] bg-[#FAFAFA] border border-[#E5E5E5] px-2 py-0.5 rounded">
+                Deepgram Nova-2 STT
+              </span>
+            </div>
+
+            {/* Countdown Timer */}
+            <div className="flex items-baseline gap-3">
+              <span className="text-[11px] font-medium text-[#929292]">
+                Target duration: {formatTime(selectedDurationSec)}
+              </span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-mono text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
+                  {sessionState === 'recording' ? formatTime(remainingSec) : formatTime(selectedDurationSec)}
+                </span>
+                <span className="text-[11px] font-mono text-[#929292]">
+                  {sessionState === 'recording' ? 'remaining' : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Thin Linear Progress Bar */}
+          <div className="w-full bg-[#E5E5E5] h-[2px] rounded-full overflow-hidden">
+            <div
+              className="bg-[#252525] h-full transition-all duration-300"
+              style={{ width: `${sessionState === 'recording' ? Math.min(100, timerProgress) : 0}%` }}
+            />
+          </div>
+        </section>
+
+        {/* Topic & Prompt Section */}
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-[#929292] font-medium">
+              DAILY RHETORIC DRILL · SPONTANEOUS SYNTHESIS
+            </span>
+            {sessionState === 'topic_ready' && onSkipTopic && (
+              <button
+                onClick={onSkipTopic}
+                className="text-[11px] text-[#666666] hover:text-[#252525] hover:underline"
+              >
+                Skip this challenge
+              </button>
+            )}
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
+            {topic.title}
+          </h1>
+
+          <p className="text-sm sm:text-base leading-relaxed text-[#666666] font-normal pt-1 max-w-3xl">
+            {topic.question}
+          </p>
+
+          {/* Guidance tags */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <span className="inline-flex items-center gap-1.5 text-xs text-[#666666] bg-[#FAFAFA] border border-[#E5E5E5] px-2.5 py-1 rounded">
+              <span className="w-1 h-1 rounded-full bg-[#929292]" />
+              Target: 140 WPM
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-[#666666] bg-[#FAFAFA] border border-[#E5E5E5] px-2.5 py-1 rounded">
+              <span className="w-1 h-1 rounded-full bg-[#929292]" />
+              Structure: Thesis, Evidence, Synthesis
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-[#666666] bg-[#FAFAFA] border border-[#E5E5E5] px-2.5 py-1 rounded">
+              <span className="w-1 h-1 rounded-full bg-[#929292]" />
+              AI Cadence Tracking
+            </span>
+          </div>
+
+          {/* Optional hints toggle */}
+          {topic.hints && topic.hints.length > 0 && (
+            <div className="pt-2">
+              <button
+                onClick={() => setShowHints(!showHints)}
+                className="text-xs text-[#666666] hover:text-[#252525] underline"
+              >
+                {showHints ? 'Hide speaking angles' : 'View speaking angles'}
+              </button>
+              {showHints && (
+                <ul className="mt-2.5 grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-[#FAFAFA] rounded border border-[#E5E5E5] text-xs text-[#666666]">
+                  {topic.hints.map((hint, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-[#252525] mt-1.5 flex-shrink-0" />
+                      <span>{hint}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Acoustic Visualizer */}
+        <section className="flex flex-col gap-2 pt-1 pb-1">
+          <div className="flex items-center justify-between text-[11px] font-mono text-[#929292]">
+            <span>VOICE FREQUENCY SPECTRUM</span>
+            <span>REAL-TIME RMS AUDIO</span>
+          </div>
+          <WaveformVisualizer isRecording={isRecording} volume={currentVolume} barCount={48} />
+        </section>
+
+        {/* Live Speech Transcript Box */}
+        <section className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#252525]" />
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[#252525] font-semibold">
+                Live Speech Transcription
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-[#929292]">
+              {wordCount} words captured
+            </span>
+          </div>
+
+          <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded p-5 flex flex-col justify-between gap-4 min-h-[120px]">
+            <p className="text-sm leading-relaxed text-[#666666]">
+              {finalTranscript && <span>{finalTranscript} </span>}
+              {interimText && (
+                <span className="text-[#252525] font-medium bg-[#E5E5E5]/40 px-0.5 rounded">
+                  {interimText}
+                </span>
+              )}
+              {!finalTranscript && !interimText && (
+                <span className="text-[#929292] italic">
+                  {sessionState === 'recording'
+                    ? 'Listening... Speak clearly into your microphone.'
+                    : 'Transcript will appear here in real-time as you speak.'}
+                </span>
+              )}
+            </p>
+
+            {/* Inline Real-time Metrics */}
+            <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-[#E5E5E5] text-xs font-mono text-[#666666]">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#929292]">Words spoken:</span>
+                <span className="font-medium text-[#252525]">{wordCount}</span>
+              </div>
+              <span className="text-[#E5E5E5]">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#929292]">Current pace:</span>
+                <span className="font-medium text-[#252525]">{currentWpm} WPM</span>
+              </div>
+              <span className="text-[#E5E5E5]">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#929292]">Filler word count:</span>
+                <span className="font-medium text-[#252525]">{fillerCount}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Processing State Indicator */}
+        {sessionState === 'processing' && (
+          <div className="p-6 bg-[#FAFAFA] rounded border border-[#E5E5E5] text-center space-y-3">
+            <Sparkles className="w-5 h-5 text-[#252525] animate-spin mx-auto" />
+            <h4 className="text-sm font-bold text-[#252525]">
+              Analyzing Speech & Synthesizing Honest Diagnosis
+            </h4>
+            <p className="text-xs text-[#666666] max-w-md mx-auto">
+              Running signal processing, checking logical coherence, detecting filler words, and compiling exact grammatical corrections...
+            </p>
+          </div>
+        )}
+
+        {/* Error notification */}
+        {errorMessage && (
+          <div className="p-4 bg-[#FAFAFA] border border-[#E5E5E5] rounded text-xs text-[#252525] flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-[#929292] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-bold">Notice</p>
+              <p className="text-[#666666] mt-0.5">{errorMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Primary Controls Inside Card */}
+        <section className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-[#E5E5E5]">
+          <div className="flex items-center gap-2">
+            {sessionState === 'topic_ready' && (
+              <div className="flex items-center gap-1.5 text-xs text-[#666666]">
+                <Clock className="w-3.5 h-3.5 text-[#929292]" />
+                <span>Duration:</span>
+                {durationOptions.map((sec) => (
+                  <button
+                    key={sec}
+                    onClick={() => setSelectedDurationSec(sec)}
+                    className={`px-2 py-1 rounded text-xs font-mono transition-colors ${
+                      selectedDurationSec === sec
+                        ? 'bg-[#252525] text-white font-bold'
+                        : 'bg-[#FAFAFA] text-[#666666] border border-[#E5E5E5] hover:border-[#252525]'
+                    }`}
+                  >
+                    {sec >= 60 ? `${sec / 60}m` : `${sec}s`}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {sessionState === 'error' && (
+              <button
+                onClick={() => executeEvaluation(latestAudioAnalysisRef.current)}
+                className="px-4 py-2 rounded bg-[#252525] text-white text-xs font-medium"
+              >
+                Retry Evaluation
+              </button>
+            )}
+          </div>
+
+          <div>
+            {sessionState === 'topic_ready' && (
+              <button
+                onClick={handleStartRecording}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#252525] hover:bg-[#3a3a3a] text-white text-xs font-medium px-6 py-2.5 rounded transition-colors"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Start Speaking</span>
+              </button>
+            )}
+
+            {sessionState === 'recording' && (
+              <button
+                onClick={handleStopRecording}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#252525] hover:bg-[#151515] text-white text-xs font-medium px-6 py-2.5 rounded transition-colors"
+              >
+                <span>Finish & Analyze Response</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* Audio Playback Bar if recorded */}
       {audioUrl && (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <Volume2 className="w-4 h-4 text-brand-500" />
-            <span>Recorded Speech Playback</span>
+        <div className="bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#252525]">
+            <Volume2 className="w-4 h-4 text-[#929292]" />
+            <span>Audio Take Review</span>
           </div>
           <audio controls src={audioUrl} className="h-8 max-w-sm w-full" />
         </div>

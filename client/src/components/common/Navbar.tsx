@@ -1,12 +1,5 @@
 import React from 'react';
 import {
-  Mic,
-  LayoutDashboard,
-  Compass,
-  Sparkles,
-  BarChart3,
-  History,
-  Settings,
   Flame,
   Moon,
   Sun,
@@ -33,121 +26,103 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleDarkMode,
 }) => {
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'modes', label: 'Practice Modes', icon: Compass },
-    { id: 'topics', label: 'Topic Bank', icon: Sparkles },
-    { id: 'progress', label: 'Progress', icon: BarChart3 },
-    { id: 'history', label: 'History', icon: History },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'modes', label: 'Practice Modes' },
+    { id: 'topics', label: 'Topic Bank' },
+    { id: 'progress', label: 'Progress' },
+    { id: 'history', label: 'History' },
+    { id: 'settings', label: 'Settings' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
+    <header className="bg-white border-b border-[#E5E5E5] sticky top-0 z-50 select-none">
+      <div className="w-full max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
+        {/* Brand & Primary Navigation */}
+        <div className="flex items-center gap-10">
           <div
-            className="flex items-center gap-3 cursor-pointer group"
             onClick={() => onNavigate('dashboard')}
+            className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/25 group-hover:scale-105 transition-transform">
-              <Mic className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-                SpeakUp
-              </span>
-              <p className="text-[10px] font-medium tracking-wider text-slate-500 dark:text-slate-400 uppercase">
-                Think. Explore. Speak. Improve.
-              </p>
-            </div>
+            <span className="w-6 h-6 bg-[#252525] text-white flex items-center justify-center rounded-[3px] font-bold text-xs tracking-tight">
+              S
+            </span>
+            <span className="font-semibold text-base tracking-tight text-[#252525]">
+              SpeakUp
+            </span>
           </div>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
+          {/* Desktop Navigation Items */}
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium h-16">
             {navItems.map((item) => {
-              const Icon = item.icon;
               const isActive = currentView === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => onNavigate(item.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`h-full inline-flex items-center transition-colors pb-1 pt-1 ${
                     isActive
-                      ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-semibold'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                      ? 'text-[#252525] font-semibold border-b-2 border-[#252525]'
+                      : 'text-[#666666] hover:text-[#252525] font-normal'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}`} />
                   {item.label}
                 </button>
               );
             })}
           </nav>
+        </div>
 
-          {/* Actions & Status */}
-          <div className="flex items-center gap-3">
-            {/* Streak Badge */}
-            <div
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 text-xs font-semibold"
-              title={`${streakDays} Day Practice Streak`}
-            >
-              <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-              <span>{streakDays}d streak</span>
-            </div>
-
-            {/* Provider status badge */}
-            <button
-              onClick={() => onNavigate('settings')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                settings.isDemoMode || !settings.geminiApiKey
-                  ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50 hover:bg-amber-100'
-                  : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50'
-              }`}
-              title="Click to manage AI and STT providers"
-            >
-              {settings.isDemoMode || !settings.geminiApiKey ? (
-                <>
-                  <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                  <span>Demo Mode</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                  <span>AI Connected</span>
-                </>
-              )}
-            </button>
-
-            {/* Theme Toggle */}
-            <button
-              onClick={onToggleDarkMode}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+        {/* Right Controls */}
+        <div className="flex items-center gap-3">
+          {/* Streak Indicator Badge */}
+          <div
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-white border border-[#E5E5E5] rounded text-xs font-medium text-[#252525]"
+            title={`${streakDays} Day Practice Streak`}
+          >
+            <Flame className="w-3.5 h-3.5 text-[#252525]" />
+            <span>{streakDays}d streak</span>
           </div>
+
+          {/* Provider status badge */}
+          <button
+            onClick={() => onNavigate('settings')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border transition-colors ${
+              settings.isDemoMode || !settings.geminiApiKey
+                ? 'bg-[#F5F5F4] text-[#666666] border-[#E5E5E5] hover:border-[#252525]'
+                : 'bg-[#F5F5F4] text-[#252525] border-[#E5E5E5] font-semibold'
+            }`}
+            title="Manage AI and STT providers"
+          >
+            {settings.isDemoMode || !settings.geminiApiKey ? (
+              <>
+                <AlertTriangle className="w-3 h-3 text-[#666666]" />
+                <span>Demo Mode</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="w-3 h-3 text-[#252525]" />
+                <span>AI Connected</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
       {/* Mobile navigation row */}
-      <div className="md:hidden flex items-center justify-around border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 bg-slate-50/50 dark:bg-slate-900/50 overflow-x-auto">
+      <div className="md:hidden flex items-center justify-around border-t border-[#E5E5E5] px-2 py-2 bg-white overflow-x-auto">
         {navItems.map((item) => {
-          const Icon = item.icon;
           const isActive = currentView === item.id;
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center gap-0.5 px-2.5 py-1 text-[11px] font-medium whitespace-nowrap rounded ${
+              className={`px-2.5 py-1 text-xs whitespace-nowrap rounded ${
                 isActive
-                  ? 'text-brand-600 dark:text-brand-400 font-bold'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'text-[#252525] font-bold border-b-2 border-[#252525]'
+                  : 'text-[#666666]'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              <span>{item.label}</span>
+              {item.label}
             </button>
           );
         })}

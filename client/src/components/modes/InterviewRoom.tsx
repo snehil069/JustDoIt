@@ -10,14 +10,8 @@ import {
   Mic,
   Square,
   Sparkles,
-  RotateCcw,
-  Volume2,
   AlertCircle,
-  Clock,
   ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  HelpCircle,
 } from 'lucide-react';
 
 interface InterviewRoomProps {
@@ -31,7 +25,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   onEvaluationComplete,
   onCancel,
 }) => {
-  const [interviewType, setInterviewType] = useState<string>(
+  const [interviewType] = useState<string>(
     topic.modeContext?.interviewType || 'behavioral-star'
   );
   const [turns, setTurns] = useState<InterviewTurn[]>([]);
@@ -86,7 +80,6 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
       return;
     }
 
-    // Get follow-up question
     try {
       setStatus('processing');
       const result = await api.sendInterviewTurn({
@@ -155,32 +148,36 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn pb-16">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-orange-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-amber-900 space-y-4">
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
+      {/* Header Card */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30">
-            <Briefcase className="w-3.5 h-3.5" />
-            <span>Mode D — Interview Simulator</span>
+          <div className="flex items-center space-x-2">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-[#929292] border border-[#E5E5E5] px-2 py-0.5 rounded">
+              Mode 04 — Interview Simulator
+            </span>
+            <span className="text-xs text-[#666666]">Framework: Behavioral STAR</span>
           </div>
 
-          <span className="text-xs font-mono px-3 py-1 bg-black/40 rounded-xl border border-white/10">
+          <span className="text-xs font-mono px-3 py-1 bg-[#F5F5F4] border border-[#E5E5E5] rounded-lg text-[#252525]">
             Question {questionCount} of {maxQuestions}
           </span>
         </div>
 
-        <div>
-          <span className="text-xs uppercase tracking-wider text-amber-300 font-semibold">
-            Interviewer Question
+        <div className="space-y-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292] block">
+            Executive Interviewer Question
           </span>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white mt-1 leading-snug">
-            "{currentQuestion}"
-          </h1>
+          <div className="bg-[#F5F5F4] p-5 rounded-lg border border-[#E5E5E5]">
+            <h1 className="text-lg sm:text-xl font-medium tracking-tight text-[#252525] leading-relaxed">
+              "{currentQuestion}"
+            </h1>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-amber-200/80 pt-2 border-t border-amber-900/60">
-          <span>Remember the STAR method: Situation, Task, Action, Result. Avoid vague summaries.</span>
-          <button onClick={onCancel} className="text-slate-400 hover:text-white underline">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#E5E5E5] text-xs text-[#666666]">
+          <span>Anchor your answer in STAR: Situation, Task, Action taken, and quantifiable Result.</span>
+          <button onClick={onCancel} className="text-[#929292] hover:text-[#252525] transition-colors font-mono">
             Exit Interview
           </button>
         </div>
@@ -192,17 +189,17 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
           {turns.map((turn, i) => (
             <div
               key={i}
-              className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2 text-xs"
+              className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-3"
             >
-              <div className="font-bold text-slate-500 uppercase tracking-wider">
+              <div className="font-mono text-[11px] text-[#929292] uppercase tracking-wider">
                 Question {i + 1}: {turn.interviewerQuestion}
               </div>
-              <p className="text-slate-800 dark:text-slate-200 text-sm leading-relaxed pl-2 border-l-2 border-brand-500">
+              <p className="text-[#252525] text-xs sm:text-sm leading-relaxed pl-3 border-l-2 border-[#252525]">
                 {turn.userAnswer}
               </p>
               {turn.interviewerFollowup && (
-                <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/60 dark:border-amber-900/40 text-amber-800 dark:text-amber-200">
-                  <span className="font-bold">Interviewer Assessment:</span> {turn.interviewerFollowup}
+                <div className="mt-2 p-3.5 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] text-xs text-[#666666] leading-relaxed">
+                  <span className="font-medium text-[#252525]">Interviewer Assessment:</span> {turn.interviewerFollowup}
                 </div>
               )}
             </div>
@@ -211,32 +208,37 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
       )}
 
       {/* Recording Area */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
-          <span>{status === 'recording' ? 'Recording Spoken Response' : 'Candidate Turn'}</span>
-          {status === 'recording' && <span className="text-rose-500 font-mono animate-pulse">● RECORDING</span>}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-4">
+        <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-[#929292]">
+          <span>{status === 'recording' ? 'Transmitting Spoken Response' : 'Candidate Turn'}</span>
+          {status === 'recording' && (
+            <span className="text-[#252525] flex items-center space-x-1.5 font-medium">
+              <span className="w-2 h-2 rounded-full bg-[#252525] animate-ping inline-block"></span>
+              <span>LIVE TRANSMISSION</span>
+            </span>
+          )}
         </div>
 
         <WaveformVisualizer isRecording={isRecording} volume={currentVolume} />
 
         {status === 'recording' && (
-          <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800 text-xs min-h-[60px]">
-            {finalTranscript} <span className="text-brand-500 italic">{interimText}</span>
+          <div className="p-3 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] text-xs text-[#252525] min-h-[60px] font-mono leading-relaxed">
+            {finalTranscript} <span className="text-[#929292]">{interimText}</span>
           </div>
         )}
 
         {errorMessage && (
-          <div className="p-3 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 text-xs rounded-xl flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <div className="p-3 bg-[#F5F5F4] text-[#252525] text-xs rounded-lg border border-[#E5E5E5] flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-[#252525] flex-shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex items-center justify-center pt-2">
           {status === 'idle' && (
             <button
               onClick={handleStartAnswering}
-              className="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md flex items-center gap-2 transition-all hover:scale-105"
+              className="px-6 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
             >
               <Mic className="w-4 h-4" />
               <span>Answer Question</span>
@@ -246,7 +248,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
           {status === 'recording' && (
             <button
               onClick={handleStopAnswering}
-              className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md flex items-center gap-2"
+              className="px-6 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
             >
               <Square className="w-4 h-4 fill-white" />
               <span>Submit Answer & Continue</span>
@@ -254,16 +256,16 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
           )}
 
           {status === 'processing' && (
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 animate-pulse">
-              <Sparkles className="w-4 h-4 animate-spin text-amber-500" />
+            <div className="flex items-center space-x-2 text-xs font-mono text-[#666666] animate-pulse">
+              <Sparkles className="w-4 h-4 animate-spin text-[#252525]" />
               <span>Interviewer is analyzing your STAR formulation...</span>
             </div>
           )}
 
           {status === 'finalizing' && (
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 animate-pulse">
-              <Sparkles className="w-4 h-4 animate-spin text-brand-600" />
-              <span>Generating comprehensive interview report...</span>
+            <div className="flex items-center space-x-2 text-xs font-mono text-[#666666] animate-pulse">
+              <Sparkles className="w-4 h-4 animate-spin text-[#252525]" />
+              <span>Compiling comprehensive interview report...</span>
             </div>
           )}
         </div>

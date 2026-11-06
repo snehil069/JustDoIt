@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Topic, PracticeSession } from '@shared/types/index';
 import { PracticeEngine } from '../practice/PracticeEngine';
-import { HelpCircle, Sparkles, User, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface ExplainSimplyModeProps {
   topic: Topic;
@@ -20,10 +20,10 @@ export const ExplainSimplyMode: React.FC<ExplainSimplyModeProps> = ({
   const [hasStarted, setHasStarted] = useState(false);
 
   const audiences = [
-    { id: '10-year-old child', label: '10-Year-Old Child', desc: 'Use playground analogies, simple words, zero jargon' },
-    { id: 'elderly grandparent', label: 'Grandparent', desc: 'Connect to pre-internet concepts and everyday life' },
-    { id: 'high school freshman', label: 'High School Student', desc: 'Relatable teenage analogies, introductory logic' },
-    { id: 'non-technical CEO', label: 'Non-Technical CEO', desc: 'Business value, risks, trade-offs, clear ROI' },
+    { id: '10-year-old child', label: '10-Year-Old Child', desc: 'Use playground analogies, intuitive metaphors, zero jargon' },
+    { id: 'elderly grandparent', label: 'Grandparent', desc: 'Connect to pre-digital concepts and everyday tactile realities' },
+    { id: 'high school freshman', label: 'High School Student', desc: 'Relatable student scenarios with introductory analytical logic' },
+    { id: 'non-technical CEO', label: 'Non-Technical Executive', desc: 'Focus strictly on systemic value, strategic risks, and clear ROI' },
   ];
 
   const enrichedTopic: Topic = {
@@ -45,66 +45,82 @@ export const ExplainSimplyMode: React.FC<ExplainSimplyModeProps> = ({
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn pb-16">
-      <div className="bg-gradient-to-r from-pink-900 to-rose-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-pink-800 space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs font-semibold border border-pink-500/30">
-          <HelpCircle className="w-3.5 h-3.5" />
-          <span>Mode E — Explain Simply</span>
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
+      {/* Header */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-[#929292] border border-[#E5E5E5] px-2 py-0.5 rounded">
+              Mode 05 — Explain Simply
+            </span>
+            <span className="text-xs text-[#666666]">Feynman Technique Calibration</span>
+          </div>
+          <span className="text-xs font-mono px-3 py-1 bg-[#F5F5F4] border border-[#E5E5E5] rounded-lg text-[#252525]">
+            Target: {targetAudience.toUpperCase()}
+          </span>
         </div>
 
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Explain {topic.title}
+        <div className="space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
+            Explain: {topic.title}
           </h1>
-          <p className="mt-2 text-pink-100 text-sm leading-relaxed">
-            "If you can't explain it simply, you don't understand it well enough."
-          </p>
+          <div className="bg-[#F5F5F4] p-5 rounded-lg border border-[#E5E5E5]">
+            <p className="text-base sm:text-lg text-[#252525] leading-relaxed">
+              "If you cannot explain it simply without relying on specialized vocabulary, you do not understand it fundamentally."
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+      {/* Target Audience Selector */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-5">
         <div>
-          <h3 className="font-bold text-slate-900 dark:text-white text-base">
-            Choose Your Target Audience
+          <h3 className="text-sm font-semibold text-[#252525]">
+            Select Target Audience Persona
           </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            The AI evaluator will judge whether your vocabulary, analogies, and pacing match this audience.
+          <p className="text-xs text-[#666666] mt-0.5">
+            The evaluation engine evaluates your cognitive analogies, vocabulary simplicity, and listener engagement based on this persona.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {audiences.map((aud) => (
             <div
               key={aud.id}
               onClick={() => setTargetAudience(aud.id)}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${
+              className={`p-5 rounded-lg border cursor-pointer transition-all space-y-2 ${
                 targetAudience === aud.id
-                  ? 'bg-pink-50 dark:bg-pink-950/40 border-pink-500 shadow-sm'
-                  : 'bg-slate-50 dark:bg-slate-850 border-slate-200/60 dark:border-slate-800 hover:border-pink-300'
+                  ? 'bg-[#F5F5F4] border-[#252525]'
+                  : 'bg-[#FFFFFF] border-[#E5E5E5] hover:border-[#252525]'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-slate-900 dark:text-white">
+                <span className="font-semibold text-sm text-[#252525]">
                   {aud.label}
                 </span>
-                {targetAudience === aud.id && (
-                  <span className="w-2 h-2 rounded-full bg-pink-500" />
-                )}
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    targetAudience === aud.id ? 'bg-[#252525]' : 'bg-[#E5E5E5]'
+                  }`}
+                />
               </div>
-              <p className="text-xs text-slate-500 mt-1">{aud.desc}</p>
+              <p className="text-xs text-[#666666] leading-relaxed">{aud.desc}</p>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-          <button onClick={onCancel} className="text-xs text-slate-500 hover:underline">
-            Cancel
+        <div className="flex items-center justify-between pt-4 border-t border-[#E5E5E5]">
+          <button
+            onClick={onCancel}
+            className="text-xs text-[#666666] hover:text-[#252525] transition-colors font-mono"
+          >
+            Cancel Session
           </button>
           <button
             onClick={() => setHasStarted(true)}
-            className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+            className="px-5 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
           >
-            <span>Proceed to Speaking</span>
+            <span>Proceed to Speaking Stage</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

@@ -10,14 +10,10 @@ import {
   Mic,
   Square,
   Sparkles,
-  RotateCcw,
-  Volume2,
   AlertCircle,
-  Clock,
-  ArrowRight,
-  ShieldCheck,
-  Bot,
   User,
+  Bot,
+  ArrowRight,
 } from 'lucide-react';
 
 interface DebateRoomProps {
@@ -31,15 +27,14 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
   onEvaluationComplete,
   onCancel,
 }) => {
-  const [motion, setMotion] = useState(
+  const [motion] = useState(
     topic.modeContext?.debateMotion || topic.question
   );
-  const [userPosition, setUserPosition] = useState<'for' | 'against'>('for');
-  const [totalRounds, setTotalRounds] = useState<number>(3);
+  const [userPosition] = useState<'for' | 'against'>('for');
+  const [totalRounds] = useState<number>(3);
   const [currentRound, setCurrentRound] = useState<number>(1);
   const [turns, setTurns] = useState<DebateTurn[]>([]);
   const [isAiResponding, setIsAiResponding] = useState(false);
-  const [critiqueHistory, setCritiqueHistory] = useState<string[]>([]);
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing_turn' | 'finalizing' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -75,7 +70,7 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
 
   const handleStopSpeaking = async () => {
     stopListening();
-    const audioData = stopRecording();
+    stopRecording();
 
     const userSpeech = fullTranscript.trim();
     if (!userSpeech) {
@@ -84,7 +79,6 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
       return;
     }
 
-    // Add user turn
     const userTurn: DebateTurn = {
       speaker: 'user',
       roundNumber: currentRound,
@@ -94,13 +88,11 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
     const updatedTurns = [...turns, userTurn];
     setTurns(updatedTurns);
 
-    // If last round, proceed to final evaluation
     if (currentRound >= totalRounds) {
       await finalizeDebate(updatedTurns);
       return;
     }
 
-    // Otherwise, generate AI Counterargument
     try {
       setStatus('processing_turn');
       setIsAiResponding(true);
@@ -122,10 +114,6 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
       };
 
       setTurns((prev) => [...prev, aiTurn]);
-      if (aiResult.roundCritique) {
-        setCritiqueHistory((prev) => [...prev, aiResult.roundCritique!]);
-      }
-
       setCurrentRound((prev) => prev + 1);
       setStatus('idle');
       setIsAiResponding(false);
@@ -143,7 +131,7 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
       setStatus('finalizing');
       const allUserArguments = allTurns
         .filter((t) => t.speaker === 'user')
-        .map((t, idx) => `[Round ${t.roundNumber} Opening/Rebuttal]: ${t.content}`)
+        .map((t) => `[Round ${t.roundNumber} Opening/Rebuttal]: ${t.content}`)
         .join('\n\n');
 
       const settings = storageService.getSettings();
@@ -185,57 +173,58 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn pb-16">
-      {/* Debate Motion Header */}
-      <div className="bg-gradient-to-r from-violet-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-6 sm:p-8 shadow-xl border border-violet-900 space-y-4">
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
+      {/* Debate Header */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/20 text-violet-300 text-xs font-semibold border border-violet-500/30">
-            <Users className="w-3.5 h-3.5" />
-            <span>Mode C — Debate Arena</span>
+          <div className="flex items-center space-x-2">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-[#929292] border border-[#E5E5E5] px-2 py-0.5 rounded">
+              Mode 03 — Debate Arena
+            </span>
+            <span className="text-xs text-[#666666]">Adversarial Dialectic Engine</span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="px-2.5 py-1 rounded-md bg-white/10 text-white">
+          <div className="flex items-center space-x-2 text-xs font-mono">
+            <span className="px-2.5 py-1 rounded bg-[#F5F5F4] border border-[#E5E5E5] text-[#252525]">
               Round {currentRound} of {totalRounds}
             </span>
-            <span className={`px-2.5 py-1 rounded-md font-bold uppercase tracking-wider ${
-              userPosition === 'for' ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
-            }`}>
-              You are: {userPosition.toUpperCase()}
+            <span className="px-2.5 py-1 rounded bg-[#252525] text-[#FFFFFF] uppercase tracking-wider font-semibold">
+              Position: {userPosition.toUpperCase()}
             </span>
           </div>
         </div>
 
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-violet-300">
+        <div className="space-y-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292] block">
             Debate Motion
           </span>
-          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1 text-white leading-snug">
-            "{motion}"
-          </h1>
+          <div className="bg-[#F5F5F4] p-5 rounded-lg border border-[#E5E5E5]">
+            <h1 className="text-lg sm:text-xl font-medium tracking-tight text-[#252525] leading-relaxed">
+              "{motion}"
+            </h1>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-slate-300 pt-2 border-t border-violet-800/60">
-          <span>Your opponent will not automatically agree with you. Defend with facts, not vague opinions.</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#E5E5E5] text-xs text-[#666666]">
+          <span>The opponent AI scrutinizes empirical leaps, ungrounded claims, and logical inconsistencies.</span>
           <button
             onClick={onCancel}
-            className="text-slate-400 hover:text-white underline"
+            className="text-[#929292] hover:text-[#252525] transition-colors self-start sm:self-auto font-mono"
           >
             Leave Arena
           </button>
         </div>
       </div>
 
-      {/* Interactive Dialogue History */}
+      {/* Dialogue Stream */}
       <div className="space-y-4">
         {turns.length === 0 && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 text-center space-y-2">
-            <h3 className="font-bold text-slate-900 dark:text-white">
+          <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-8 text-center space-y-2">
+            <h3 className="text-sm font-semibold text-[#252525]">
               Deliver Your Opening Argument
             </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              State your thesis clearly, present your strongest premise, and provide one concrete example.
-              When ready, press Start Speaking below.
+            <p className="text-xs text-[#666666] max-w-md mx-auto leading-relaxed">
+              State your thesis clearly, present your primary premise, and back it with a concrete evidentiary anchor.
             </p>
           </div>
         )}
@@ -243,72 +232,73 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
         {turns.map((turn, i) => (
           <div
             key={i}
-            className={`p-5 rounded-2xl border transition-all ${
+            className={`p-5 rounded-lg border transition-all ${
               turn.speaker === 'user'
-                ? 'bg-brand-50/50 dark:bg-brand-950/20 border-brand-200/80 dark:border-brand-900/40 mr-4 sm:mr-12'
-                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 ml-4 sm:ml-12 shadow-sm'
+                ? 'bg-[#F5F5F4] border-[#E5E5E5] mr-4 sm:mr-16'
+                : 'bg-[#FFFFFF] border-[#252525] ml-4 sm:ml-16'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className={`p-1.5 rounded-lg ${turn.speaker === 'user' ? 'bg-brand-600 text-white' : 'bg-violet-600 text-white'}`}>
+              <div className="flex items-center space-x-2">
+                <span className={`p-1 rounded ${turn.speaker === 'user' ? 'bg-[#252525] text-[#FFFFFF]' : 'bg-[#E5E5E5] text-[#252525]'}`}>
                   {turn.speaker === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
                 </span>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  {turn.speaker === 'user' ? `You (${userPosition.toUpperCase()})` : `Opponent AI (Counter-Argument)`}
+                <span className="text-xs font-medium text-[#252525]">
+                  {turn.speaker === 'user' ? `You (${userPosition.toUpperCase()})` : `Opponent Counter-Rebuttal`}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-400 font-mono">Round {turn.roundNumber}</span>
+              <span className="text-[11px] text-[#929292] font-mono">Round {turn.roundNumber}</span>
             </div>
 
-            <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#252525] leading-relaxed pt-1">
               {turn.content}
             </p>
           </div>
         ))}
 
         {isAiResponding && (
-          <div className="p-4 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-900/40 text-xs text-violet-800 dark:text-violet-200 flex items-center gap-2 animate-pulse ml-4 sm:ml-12">
-            <Sparkles className="w-4 h-4 animate-spin text-violet-600" />
+          <div className="p-4 rounded-lg bg-[#FFFFFF] border border-[#E5E5E5] text-xs text-[#666666] flex items-center space-x-2 animate-pulse ml-4 sm:ml-16">
+            <Sparkles className="w-4 h-4 animate-spin text-[#252525]" />
             <span>Opponent is scrutinizing your argument and formulating counter-premises...</span>
           </div>
         )}
       </div>
 
       {/* Speaking Controller */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            {status === 'recording' ? 'Recording Your Spoken Rebuttal' : `Ready for Round ${currentRound}`}
+          <span className="text-xs font-mono uppercase tracking-wider text-[#929292]">
+            {status === 'recording' ? 'Recording Spoken Argument' : `Awaiting Round ${currentRound}`}
           </span>
           {status === 'recording' && (
-            <span className="text-xs font-mono font-bold text-rose-500 animate-pulse">
-              ● LIVE
+            <span className="text-xs font-mono font-medium text-[#252525] flex items-center space-x-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#252525] animate-ping inline-block"></span>
+              <span>LIVE TRANSMISSION</span>
             </span>
           )}
         </div>
 
         <WaveformVisualizer isRecording={isRecording} volume={currentVolume} />
 
-        {/* Live speech transcription */}
+        {/* Live transcript box */}
         {status === 'recording' && (
-          <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 min-h-[60px]">
-            {finalTranscript} <span className="text-brand-500 italic">{interimText}</span>
+          <div className="p-3 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] text-xs text-[#252525] min-h-[60px] font-mono leading-relaxed">
+            {finalTranscript} <span className="text-[#929292]">{interimText}</span>
           </div>
         )}
 
         {errorMessage && (
-          <div className="p-3 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 text-xs rounded-xl flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+          <div className="p-3 bg-[#F5F5F4] text-[#252525] text-xs rounded-lg border border-[#E5E5E5] flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-[#252525] flex-shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex items-center justify-center pt-2">
           {status === 'idle' && (
             <button
               onClick={handleStartSpeaking}
-              className="px-6 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md flex items-center gap-2 transition-all hover:scale-105"
+              className="px-6 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
             >
               <Mic className="w-4 h-4" />
               <span>{turns.length === 0 ? 'Deliver Opening Argument' : 'Speak Rebuttal'}</span>
@@ -318,7 +308,7 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
           {status === 'recording' && (
             <button
               onClick={handleStopSpeaking}
-              className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md flex items-center gap-2"
+              className="px-6 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
             >
               <Square className="w-4 h-4 fill-white" />
               <span>Submit Argument & Hear Counter</span>
@@ -326,9 +316,9 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
           )}
 
           {status === 'finalizing' && (
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 animate-pulse">
-              <Sparkles className="w-4 h-4 animate-spin text-brand-600" />
-              <span>Finalizing multi-round debate evaluation...</span>
+            <div className="flex items-center space-x-2 text-xs font-mono text-[#666666] animate-pulse">
+              <Sparkles className="w-4 h-4 animate-spin text-[#252525]" />
+              <span>Compiling multi-round debate evaluation...</span>
             </div>
           )}
         </div>

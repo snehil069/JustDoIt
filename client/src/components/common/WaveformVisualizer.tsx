@@ -9,31 +9,31 @@ interface WaveformVisualizerProps {
 export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   isRecording,
   volume,
-  barCount = 28,
+  barCount = 48,
 }) => {
   return (
-    <div className="flex items-center justify-center gap-1 h-12 px-4 py-2 bg-slate-900/5 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-800">
+    <div className="w-full h-12 bg-[#FAFAFA] border border-[#E5E5E5] rounded p-2 flex items-center justify-between gap-[3px] overflow-hidden select-none">
       {Array.from({ length: barCount }).map((_, i) => {
-        // Natural curved shape taller in center
         const centerOffset = Math.abs(i - barCount / 2) / (barCount / 2);
-        const curveWeight = 1 - centerOffset * 0.45;
+        const curveWeight = 1 - centerOffset * 0.4;
 
-        let heightPercent = 15;
+        let heightPercent = 14;
         if (isRecording) {
-          // Dynamic jitter based on index and real volume
-          const jitter = Math.sin(i * 0.8 + Date.now() * 0.005) * 0.2 + 0.8;
-          heightPercent = Math.min(100, Math.max(15, volume * 100 * curveWeight * jitter));
+          const jitter = Math.sin(i * 0.7 + Date.now() * 0.006) * 0.25 + 0.75;
+          heightPercent = Math.min(100, Math.max(14, volume * 100 * curveWeight * jitter));
         }
 
+        const isPeak = heightPercent > 35;
+
         return (
-          <span
+          <div
             key={i}
-            className={`w-1 rounded-full transition-all duration-75 ${
+            className={`flex-1 rounded-full transition-all duration-75 ${
               isRecording
-                ? volume > 0.05
-                  ? 'bg-brand-500 dark:bg-brand-400'
-                  : 'bg-slate-300 dark:bg-slate-600'
-                : 'bg-slate-200 dark:bg-slate-700'
+                ? isPeak
+                  ? 'bg-[#252525]'
+                  : 'bg-[#A3A3A3]'
+                : 'bg-[#E5E5E5]'
             }`}
             style={{ height: `${heightPercent}%` }}
           />

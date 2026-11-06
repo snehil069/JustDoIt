@@ -13,10 +13,7 @@ import {
   RefreshCw,
   Play,
   Lightbulb,
-  Clock,
-  Layers,
-  HelpCircle,
-  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 
 interface TopicGeneratorViewProps {
@@ -79,7 +76,6 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
       setCurrentTopic(topic);
     } catch (e) {
       console.error('AI topic generation failed:', e);
-      // Fallback
       fetchNextTopic();
     } finally {
       setIsAiGenerating(false);
@@ -87,27 +83,38 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn pb-16">
+    <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Curated Topic Bank & AI Generator
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Explore over 100+ curated prompts across 10 categories or synthesize a novel AI speaking challenge.
-        </p>
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Repository</span>
+            <span className="text-[#E5E5E5]">•</span>
+            <span className="text-xs text-[#666666]">100+ Benchmark Prompts</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
+            Curated Practice Library
+          </h1>
+          <p className="text-xs sm:text-sm text-[#666666] max-w-2xl leading-relaxed pt-1">
+            Filter rigorous challenges by dialectical category, difficulty, and format, or synthesize custom scenarios with generative AI.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2 font-mono text-xs text-[#929292] border border-[#E5E5E5] px-3 py-1.5 rounded-lg bg-[#F5F5F4] self-start md:self-auto">
+          <span>Target Module: {selectedMode.toUpperCase()}</span>
+        </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-          <Filter className="w-4 h-4 text-brand-500" />
-          <span>Configure Filters</span>
+      {/* Filter Parameters */}
+      <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-5">
+        <div className="flex items-center space-x-2 text-xs font-mono uppercase tracking-wider text-[#929292]">
+          <Filter className="w-3.5 h-3.5 text-[#252525]" />
+          <span>Analytical Parameters</span>
         </div>
 
         {/* Category Pills */}
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <label className="text-xs font-medium text-[#252525] block">
             Category
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -116,10 +123,10 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
                 setSelectedCategory('all');
                 fetchNextTopic();
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 selectedCategory === 'all'
-                  ? 'bg-brand-600 text-white font-bold shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  ? 'bg-[#252525] text-[#FFFFFF]'
+                  : 'bg-[#FFFFFF] border border-[#E5E5E5] text-[#666666] hover:bg-[#F5F5F4]'
               }`}
             >
               All Categories
@@ -131,10 +138,10 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
                   setSelectedCategory(c.id);
                   fetchNextTopic();
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   selectedCategory === c.id
-                    ? 'bg-brand-600 text-white font-bold shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    ? 'bg-[#252525] text-[#FFFFFF]'
+                    : 'bg-[#FFFFFF] border border-[#E5E5E5] text-[#666666] hover:bg-[#F5F5F4]'
                 }`}
               >
                 {c.label}
@@ -143,22 +150,22 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
           </div>
         </div>
 
-        {/* Difficulty & Prompt Format Grid */}
+        {/* Sub-parameters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           {/* Difficulty */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Difficulty Level
+            <label className="text-xs font-medium text-[#252525] block">
+              Complexity Level
             </label>
-            <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1 text-xs">
+            <div className="flex rounded-lg border border-[#E5E5E5] bg-[#F5F5F4] p-1 text-xs">
               {(['all', 'easy', 'medium', 'hard'] as const).map((d) => (
                 <button
                   key={d}
                   onClick={() => setSelectedDifficulty(d)}
-                  className={`flex-1 py-1.5 rounded-md font-medium capitalize transition-colors ${
+                  className={`flex-1 py-1.5 rounded font-medium capitalize transition-colors ${
                     selectedDifficulty === d
-                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-[#FFFFFF] text-[#252525] border border-[#E5E5E5] font-semibold'
+                      : 'text-[#666666] hover:text-[#252525]'
                   }`}
                 >
                   {d}
@@ -169,13 +176,13 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
 
           {/* Prompt Format */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <label className="text-xs font-medium text-[#252525] block">
               Prompt Format
             </label>
             <select
               value={selectedFormat}
               onChange={(e) => setSelectedFormat(e.target.value as any)}
-              className="w-full py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-xs text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-brand-500 font-medium"
+              className="w-full py-2 px-3 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] text-xs text-[#252525] font-medium focus:outline-none focus:border-[#252525]"
             >
               <option value="all">Any Format</option>
               <option value="random-word">Random Word Challenge</option>
@@ -186,13 +193,13 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
 
           {/* Practice Mode */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Target Mode
+            <label className="text-xs font-medium text-[#252525] block">
+              Training Mode Destination
             </label>
             <select
               value={selectedMode}
               onChange={(e) => setSelectedMode(e.target.value as any)}
-              className="w-full py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-xs text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-brand-500 font-medium"
+              className="w-full py-2 px-3 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] text-xs text-[#252525] font-medium focus:outline-none focus:border-[#252525]"
             >
               <option value="impromptu">Impromptu Speaking</option>
               <option value="research">Research & Speak</option>
@@ -205,30 +212,30 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
         </div>
       </div>
 
-      {/* Generated / Selected Topic Card */}
+      {/* Selected Challenge Card */}
       {currentTopic ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 text-xs font-semibold uppercase tracking-wider">
+            <div className="flex items-center space-x-2">
+              <span className="px-2 py-0.5 rounded border border-[#E5E5E5] bg-[#F5F5F4] text-[#252525] font-mono text-[10px] uppercase tracking-wider">
                 {currentTopic.category.replace('-', ' ')}
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-medium capitalize">
+              <span className="px-2 py-0.5 rounded border border-[#E5E5E5] bg-[#F5F5F4] text-[#666666] font-mono text-[10px] capitalize">
                 {currentTopic.difficulty}
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-medium capitalize">
+              <span className="px-2 py-0.5 rounded border border-[#E5E5E5] bg-[#F5F5F4] text-[#666666] font-mono text-[10px] capitalize">
                 {currentTopic.format.replace('-', ' ')}
               </span>
-              <span className="text-[11px] text-slate-400 font-mono">
+              <span className="text-[11px] text-[#929292] font-mono pl-2">
                 Source: {currentTopic.source}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center space-x-2">
               <button
                 onClick={fetchNextTopic}
                 disabled={isLoading}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] text-[#252525] hover:bg-[#F5F5F4] text-xs font-medium flex items-center space-x-1.5 transition-colors"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
                 <span>Next Curated</span>
@@ -237,7 +244,7 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
               <button
                 onClick={handleGenerateWithAi}
                 disabled={isAiGenerating}
-                className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+                className="px-3.5 py-1.5 rounded-lg border border-[#252525] bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] text-xs font-medium flex items-center space-x-1.5 transition-colors"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isAiGenerating ? 'animate-spin' : ''}`} />
                 <span>AI Synthesize</span>
@@ -245,32 +252,34 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
             </div>
           </div>
 
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-snug">
+          <div className="space-y-3">
+            <h2 className="text-xl sm:text-2xl font-semibold text-[#252525] tracking-tight">
               {currentTopic.title}
             </h2>
-            <p className="mt-3 text-base sm:text-lg text-slate-700 dark:text-slate-200 font-medium leading-relaxed bg-slate-50 dark:bg-slate-850 p-5 rounded-xl border border-slate-200/60 dark:border-slate-800">
-              {currentTopic.question}
-            </p>
+            <div className="bg-[#F5F5F4] p-5 rounded-lg border border-[#E5E5E5]">
+              <p className="text-base sm:text-lg text-[#252525] font-normal leading-relaxed">
+                {currentTopic.question}
+              </p>
+            </div>
           </div>
 
           {currentTopic.taskExplanation && (
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 italic">
+            <p className="text-xs text-[#666666] italic leading-relaxed">
               Coach Note: {currentTopic.taskExplanation}
             </p>
           )}
 
           {currentTopic.hints && currentTopic.hints.length > 0 && (
             <div className="space-y-2 pt-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                <span>Angles & Subtopics</span>
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292] flex items-center space-x-1.5">
+                <Lightbulb className="w-3.5 h-3.5 text-[#252525]" />
+                <span>Recommended Dialectical Angles</span>
               </span>
               <div className="flex flex-wrap gap-2">
                 {currentTopic.hints.map((hint, i) => (
                   <span
                     key={i}
-                    className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs"
+                    className="px-2.5 py-1 rounded bg-[#F5F5F4] border border-[#E5E5E5] text-[#666666] text-xs font-mono"
                   >
                     {hint}
                   </span>
@@ -279,21 +288,24 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
             </div>
           )}
 
-          {/* Launch practice button */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
+          {/* Launch practice CTA */}
+          <div className="pt-4 border-t border-[#E5E5E5] flex items-center justify-between">
+            <span className="text-xs text-[#666666]">
+              Target: 1–5 min continuous articulation audit
+            </span>
             <button
               onClick={() => onStartSession(currentTopic, selectedMode)}
-              className="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+              className="px-5 py-2.5 rounded-lg bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] font-medium text-xs transition-colors flex items-center space-x-2"
             >
-              <Play className="w-4 h-4 fill-white" />
-              <span>Launch Practice with This Challenge</span>
+              <Play className="w-3.5 h-3.5 fill-white text-white" />
+              <span>Launch Practice Module</span>
             </button>
           </div>
         </div>
       ) : (
-        <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
-          <Sparkles className="w-6 h-6 text-brand-500 animate-spin mx-auto" />
-          <p className="text-xs text-slate-400 mt-2">Loading challenge...</p>
+        <div className="p-8 text-center bg-[#FFFFFF] rounded-lg border border-[#E5E5E5]">
+          <RefreshCw className="w-5 h-5 text-[#252525] animate-spin mx-auto" />
+          <p className="text-xs text-[#929292] mt-2 font-mono">Fetching challenge...</p>
         </div>
       )}
     </div>
