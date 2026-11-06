@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ProviderSettings } from '@shared/types/index';
 import { storageService } from '../../services/storage';
 import { api } from '../../services/api';
-import { isSupabaseConfigured } from '../../services/supabase';
+import { isSupabaseConfigured, updateSupabaseConfig } from '../../services/supabase';
 import {
   Trash2,
   CheckCircle2,
@@ -38,6 +38,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     latencyMs?: number;
     error?: string;
   } | null>(null);
+
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => {
+    try {
+      const cfg = JSON.parse(localStorage.getItem('speakup_supabase_v1') || '{}');
+      return cfg.url || (import.meta as any).env?.VITE_SUPABASE_URL || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => {
+    try {
+      const cfg = JSON.parse(localStorage.getItem('speakup_supabase_v1') || '{}');
+      return cfg.anonKey || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [supabaseStatusMsg, setSupabaseStatusMsg] = useState<string | null>(null);
+
+  const handleSaveSupabaseCredentials = () => {
+    if (!supabaseUrlInput || !supabaseKeyInput) {
+      updateSupabaseConfig('', '');
+      setSupabaseStatusMsg('Supabase credentials cleared. Switched to local storage.');
+      setTimeout(() => window.location.reload(), 800);
+      return;
+    }
+    updateSupabaseConfig(supabaseUrlInput, supabaseKeyInput);
+    setSupabaseStatusMsg('Supabase connected! Refreshing session...');
+    setTimeout(() => window.location.reload(), 800);
+  };
 
   const handleTestGemini = async () => {
     setTestingGemini(true);
@@ -347,6 +379,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <p className="text-[11px] text-[#929292] pt-1">
               Run the ready-to-use SQL script in <code className="bg-white px-1 py-0.5 border rounded border-[#E5E5E5]">supabase/schema.sql</code> in your Supabase SQL Editor to initialize the tables and audio storage bucket with 1 click.
             </p>
+          </div>
+
+          {/* Quick Browser Setup */}
+          <div className="space-y-3 pt-2 border-t border-[#E5E5E5]">
+            <span className="text-xs font-medium text-[#252525] block font-semibold">
+              Quick Connect (Browser Local Key Storage)
+            </span>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-[#666666] block">
+                Supabase Project URL
+              </label>
+              <input
+                type="text"
+                value={supabaseUrlInput}
+                onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                placeholder="https://your-project.supabase.co"
+                className="w-full py-2 px-3 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-[#666666] block">
+                Supabase Anon Public Key
+              </label>
+              <input
+                type="password"
+                value={supabaseKeyInput}
+                onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                placeholder="eyJhbGciOi..."
+                className="w-full py-2 px-3 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              {supabaseStatusMsg ? (
+                <span className="text-xs text-[#252525] font-mono">{supabaseStatusMsg}</span>
+              ) : (
+                <span className="text-[11px] text-[#929292]">Pasting keys here connects this browser immediately without restarting.</span>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveSupabaseCredentials}
+                className="px-4 py-2 rounded-lg bg-[#252525] text-white text-xs font-medium hover:bg-[#3f3f3f] transition-colors whitespace-nowrap"
+              >
+                Connect Supabase
+              </button>
+            </div>
           </div>
         </div>
 

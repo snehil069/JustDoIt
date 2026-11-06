@@ -1,8 +1,31 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PracticeSession, UserProgress } from '@shared/types/index';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const env = (import.meta as any).env || {};
+
+const storedConfig = (() => {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('speakup_supabase_v1') : null;
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+})();
+
+const supabaseUrl: string =
+  env.VITE_SUPABASE_URL ||
+  env.SUPABASE_URL ||
+  env.NEXT_PUBLIC_SUPABASE_URL ||
+  storedConfig?.url ||
+  '';
+
+const supabaseAnonKey: string =
+  env.VITE_SUPABASE_ANON_KEY ||
+  env.SUPABASE_ANON_KEY ||
+  env.SUPABASE_KEY ||
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  storedConfig?.anonKey ||
+  '';
 
 export const isSupabaseConfigured: boolean = Boolean(
   supabaseUrl &&
@@ -14,6 +37,20 @@ export const isSupabaseConfigured: boolean = Boolean(
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+export function updateSupabaseConfig(url: string, anonKey: string): boolean {
+  try {
+    if (url && anonKey) {
+      localStorage.setItem('speakup_supabase_v1', JSON.stringify({ url: url.trim(), anonKey: anonKey.trim() }));
+      return true;
+    } else {
+      localStorage.removeItem('speakup_supabase_v1');
+      return false;
+    }
+  } catch {
+    return false;
+  }
+}
 
 export const supabaseService = {
   /**
