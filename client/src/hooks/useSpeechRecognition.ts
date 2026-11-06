@@ -20,34 +20,27 @@ export function useSpeechRecognition() {
     }
   }, []);
 
-  const startListening = useCallback(() => {
-    const settings = storageService.getSettings();
-    setRecognitionError(null);
-    shouldListenRef.current = true;
-
-    // Check if user preferred Deepgram and has key
-    if (settings.preferredSttProvider === 'deepgram' && settings.deepgramApiKey) {
-      startDeepgramWs(settings.deepgramApiKey);
-      return;
-    }
-
-    // Default to browser SpeechRecognition
+  const startBrowserRecognition = useCallback(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setRecognitionError(
-        'Browser Speech Recognition is not supported on this browser. Please use Chrome, Edge, or configure Deepgram STT in Settings.'
+        'Speech recognition is not supported in this browser. You can type or paste your response in the box below.'
       );
       setIsListening(false);
       return;
     }
 
     try {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+      }
+
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'en-US'; // or en-IN
+      recognition.lang = 'en-US';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -78,19 +71,17 @@ export function useSpeechRecognition() {
       };
 
       recognition.onerror = (event: any) => {
-        // Ignore "no-speech" network blips unless stopping
         if (event.error !== 'no-speech') {
           console.warn('Speech recognition warning:', event.error);
         }
       };
 
       recognition.onend = () => {
-        // Chrome automatically ends recognition after pauses; restart if still recording
         if (shouldListenRef.current) {
           try {
             recognition.start();
           } catch (e) {
-            // Already started or restarting
+            // Already active or restarting
           }
         } else {
           setIsListening(false);
@@ -107,7 +98,7 @@ export function useSpeechRecognition() {
     }
   }, []);
 
-  const startDeepgramWs = (apiKey: string) => {
+  const startDeepgramWs = useCallback((apiKey: string) => {
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const defaultWsUrl = `${protocol}//${window.location.host}/ws`;
@@ -131,7 +122,8 @@ export function useSpeechRecognition() {
               setInterimText(data.transcript);
             }
           } else if (data.type === 'ERROR') {
-            setRecognitionError(`Deepgram error: ${data.message}`);
+            console.warn('Deepgram STT error:', data.message);
+            startBrowserRecognition();
           }
         } catch (e) {
           // ignore
@@ -139,16 +131,35 @@ export function useSpeechRecognition() {
       };
 
       ws.onerror = () => {
-        setRecognitionError('Deepgram WebSocket connection error.');
+        console.info('Deepgram WebSocket unavailable, falling back to browser speech recognition.');
+        startBrowserRecognition();
       };
 
       ws.onclose = () => {
-        setIsListening(false);
+        if (shouldListenRef.current && !recognitionRef.current) {
+          startBrowserRecognition();
+        } else {
+          setIsListening(false);
+        }
       };
     } catch (e: any) {
-      setRecognitionError(e.message || 'WebSocket error');
+      console.warn('Deepgram WS init error, falling back to browser recognition:', e);
+      startBrowserRecognition();
     }
-  };
+  }, [startBrowserRecognition]);
+
+  const startListening = useCallback(() => {
+    const settings = storageService.getSettings();
+    setRecognitionError(null);
+    shouldListenRef.current = true;
+
+    // If WebSocket URL is explicitly specified or running local server
+    if (settings.preferredSttProvider === 'deepgram' && settings.deepgramApiKey && (import.meta as any).env?.VITE_WS_URL) {
+      startDeepgramWs(settings.deepgramApiKey);
+    } else {
+      startBrowserRecognition();
+    }
+  }, [startBrowserRecognition, startDeepgramWs]);
 
   const stopListening = useCallback(() => {
     shouldListenRef.current = false;

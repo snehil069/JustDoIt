@@ -72,17 +72,9 @@ export function App() {
       }
     });
 
-    // Check server settings to adopt server-configured providers
+    // Check server settings for optional sync
     fetch('/api/settings')
       .then((res) => res.json())
-      .then((serverSettings) => {
-        if (serverSettings.hasDeepgramKey) {
-          const updated = storageService.saveSettings({
-            preferredSttProvider: 'deepgram',
-          });
-          setSettings(updated);
-        }
-      })
       .catch(() => {});
 
     // Fetch daily challenge

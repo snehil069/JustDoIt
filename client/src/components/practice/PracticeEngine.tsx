@@ -53,6 +53,10 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   const [showHints, setShowHints] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Manual editing and testing support
+  const [customTranscript, setCustomTranscript] = useState<string>('');
+  const [isEditingTranscript, setIsEditingTranscript] = useState<boolean>(false);
+
   // Audio & Speech hooks
   const {
     isRecording,
@@ -74,6 +78,19 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
     stopListening,
     resetTranscript,
   } = useSpeechRecognition();
+
+  // Keep custom transcript in sync with live speech unless user is manually editing
+  useEffect(() => {
+    if (!isEditingTranscript && fullTranscript) {
+      setCustomTranscript(fullTranscript);
+    }
+  }, [fullTranscript, isEditingTranscript]);
+
+  const effectiveTranscript = (customTranscript || fullTranscript).trim();
+  const latestTranscriptRef = useRef(effectiveTranscript);
+  useEffect(() => {
+    latestTranscriptRef.current = effectiveTranscript;
+  }, [effectiveTranscript]);
 
   // Timestamp-based drift-free timer
   const timerStartRef = useRef<number>(0);
@@ -99,19 +116,22 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const wordCount = fullTranscript.trim().split(/\s+/).filter(Boolean).length;
+  const wordCount = effectiveTranscript.split(/\s+/).filter(Boolean).length;
   const currentWpm = elapsedSec > 4 ? Math.round((wordCount / elapsedSec) * 60) : 0;
-  const fillerCount = (fullTranscript.match(/\b(um|uh|erm|like|you know|basically|actually)\b/gi) || []).length;
+  const fillerCount = (effectiveTranscript.match(/\b(um|uh|erm|like|you know|basically|actually)\b/gi) || []).length;
 
   const handleStartRecording = async () => {
     setErrorMessage(null);
     resetTranscript();
+    setCustomTranscript('');
+    setIsEditingTranscript(false);
 
     const micGranted = await startRecording();
     if (!micGranted) {
       setErrorMessage(
-        'Microphone access was denied or could not be initialized. Please check your browser microphone permissions.'
+        'Microphone access was denied or could not be initialized. You can still type or paste your response directly into the transcript box below to receive your evaluation!'
       );
+      setIsEditingTranscript(true);
       return;
     }
 
@@ -150,12 +170,12 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   }, [stopListening, stopRecording]);
 
   const executeEvaluation = async (audioAnalysis?: AudioAnalysisOutput | null) => {
-    const transcriptToEvaluate = fullTranscript.trim();
+    const transcriptToEvaluate = (customTranscript || fullTranscript || latestTranscriptRef.current).trim();
 
     if (!transcriptToEvaluate) {
       setSessionState('error');
       setErrorMessage(
-        'No speech was captured. Please ensure your microphone is working, speak clearly, and try recording again.'
+        'No speech was captured yet. Please speak into your microphone, or type/paste your answer directly in the box below to test!'
       );
       return;
     }
@@ -164,12 +184,16 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
       setSessionState('processing');
       const settings = storageService.getSettings();
 
+      const calculatedDuration = elapsedSec > 5 
+        ? elapsedSec 
+        : Math.max(20, Math.round((transcriptToEvaluate.split(/\s+/).filter(Boolean).length / 130) * 60));
+
       const report: EvaluationReport = await api.evaluateSpeech({
         sessionId: currentSessionIdRef.current,
         topic,
         mode,
         transcript: transcriptToEvaluate,
-        durationSec: elapsedSec || 30,
+        durationSec: calculatedDuration,
         researchNotes,
         rawAudioAnalysis: audioAnalysis
           ? {
@@ -189,9 +213,9 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
         mode,
         topic,
         status: 'completed',
-        startedAt: new Date(Date.now() - (elapsedSec || 30) * 1000).toISOString(),
+        startedAt: new Date(Date.now() - calculatedDuration * 1000).toISOString(),
         completedAt: new Date().toISOString(),
-        speakingDurationSec: elapsedSec || 30,
+        speakingDurationSec: calculatedDuration,
         originalTranscript: transcriptToEvaluate,
         researchNotes,
         audioSaved: settings.retainAudioRecordings,
@@ -212,6 +236,13 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
           'Failed to generate speech evaluation from the server. Your transcript is saved below, and you can retry.'
       );
     }
+  };
+
+  const handleLoadSampleGrammarMistakes = () => {
+    const sample = `I think AI is good for students because he have many advantages. We didn't went to class yesterday but every students are using ChatGPT now. According to me it is a honest mistake if they copy code. The teacher don't understand that technology change quickly.`;
+    setCustomTranscript(sample);
+    setIsEditingTranscript(true);
+    setErrorMessage(null);
   };
 
   const timerProgress = selectedDurationSec > 0 ? (elapsedSec / selectedDurationSec) * 100 : 0;
@@ -360,51 +391,98 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
 
         {/* Live Speech Transcript Box */}
         <section className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#252525]" />
               <span className="text-[11px] font-mono uppercase tracking-wider text-[#252525] font-semibold">
-                Live Speech Transcription
+                Live Speech Transcription & Input
               </span>
             </div>
-            <span className="text-[11px] font-mono text-[#929292]">
-              {wordCount} words captured
-            </span>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleLoadSampleGrammarMistakes}
+                className="text-[11px] font-mono underline text-[#666666] hover:text-[#252525] transition-colors"
+                title="Loads a prepared response with grammatical errors to instantly test the engine"
+              >
+                + Try Sample Response (With Errors)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsEditingTranscript(!isEditingTranscript)}
+                className="text-[11px] font-mono px-2 py-0.5 rounded border border-[#E5E5E5] text-[#252525] hover:bg-[#F5F5F4] transition-colors"
+              >
+                {isEditingTranscript ? 'View Live Mode' : 'Edit / Type'}
+              </button>
+
+              <span className="text-[11px] font-mono text-[#929292]">
+                {wordCount} words
+              </span>
+            </div>
           </div>
 
-          <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded p-5 flex flex-col justify-between gap-4 min-h-[120px]">
-            <p className="text-sm leading-relaxed text-[#666666]">
-              {finalTranscript && <span>{finalTranscript} </span>}
-              {interimText && (
-                <span className="text-[#252525] font-medium bg-[#E5E5E5]/40 px-0.5 rounded">
-                  {interimText}
-                </span>
-              )}
-              {!finalTranscript && !interimText && (
-                <span className="text-[#929292] italic">
-                  {sessionState === 'recording'
-                    ? 'Listening... Speak clearly into your microphone.'
-                    : 'Transcript will appear here in real-time as you speak.'}
-                </span>
-              )}
-            </p>
+          <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded p-5 flex flex-col justify-between gap-4 min-h-[140px]">
+            {isEditingTranscript ? (
+              <textarea
+                value={customTranscript}
+                onChange={(e) => setCustomTranscript(e.target.value)}
+                placeholder="Type or paste your speech response here to analyze it directly..."
+                className="w-full h-28 bg-white border border-[#E5E5E5] rounded p-3 text-sm leading-relaxed text-[#252525] focus:outline-none focus:border-[#252525] resize-y font-normal"
+              />
+            ) : (
+              <p className="text-sm leading-relaxed text-[#666666]">
+                {customTranscript ? (
+                  <span>{customTranscript} </span>
+                ) : (
+                  <>
+                    {finalTranscript && <span>{finalTranscript} </span>}
+                    {interimText && (
+                      <span className="text-[#252525] font-medium bg-[#E5E5E5]/40 px-0.5 rounded">
+                        {interimText}
+                      </span>
+                    )}
+                    {!finalTranscript && !interimText && (
+                      <span className="text-[#929292] italic">
+                        {sessionState === 'recording'
+                          ? 'Listening... Speak clearly into your microphone.'
+                          : 'Transcript will appear here in real-time as you speak. You can also click "+ Try Sample Response" or "Edit / Type" anytime.'}
+                      </span>
+                    )}
+                  </>
+                )}
+              </p>
+            )}
 
-            {/* Inline Real-time Metrics */}
-            <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-[#E5E5E5] text-xs font-mono text-[#666666]">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#929292]">Words spoken:</span>
-                <span className="font-medium text-[#252525]">{wordCount}</span>
+            {/* Inline Real-time Metrics & Direct Trigger */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[#E5E5E5] text-xs font-mono text-[#666666]">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#929292]">Words:</span>
+                  <span className="font-medium text-[#252525]">{wordCount}</span>
+                </div>
+                <span className="text-[#E5E5E5]">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#929292]">Pace:</span>
+                  <span className="font-medium text-[#252525]">{currentWpm} WPM</span>
+                </div>
+                <span className="text-[#E5E5E5]">•</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#929292]">Fillers:</span>
+                  <span className="font-medium text-[#252525]">{fillerCount}</span>
+                </div>
               </div>
-              <span className="text-[#E5E5E5]">•</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#929292]">Current pace:</span>
-                <span className="font-medium text-[#252525]">{currentWpm} WPM</span>
-              </div>
-              <span className="text-[#E5E5E5]">•</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#929292]">Filler word count:</span>
-                <span className="font-medium text-[#252525]">{fillerCount}</span>
-              </div>
+
+              {effectiveTranscript && sessionState !== 'recording' && sessionState !== 'processing' && (
+                <button
+                  type="button"
+                  onClick={() => executeEvaluation(latestAudioAnalysisRef.current)}
+                  className="px-3 py-1 bg-[#252525] hover:bg-[#3a3a3a] text-white rounded text-xs font-sans font-medium transition-colors"
+                >
+                  Analyze This Transcript &rarr;
+                </button>
+              )}
             </div>
           </div>
         </section>
