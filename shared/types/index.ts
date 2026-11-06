@@ -1,0 +1,243 @@
+export type Category =
+  | 'everyday-life'
+  | 'college-life'
+  | 'tech-engineering'
+  | 'computer-science'
+  | 'general-awareness'
+  | 'society-affairs'
+  | 'communication-personality'
+  | 'career-professional'
+  | 'creative-thinking'
+  | 'critical-thinking';
+
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export type PromptFormat = 'random-word' | 'open-question' | 'hypothetical-situation';
+
+export type PracticeMode =
+  | 'impromptu'
+  | 'research'
+  | 'debate'
+  | 'interview'
+  | 'explain-simply'
+  | 'real-life';
+
+export type SessionState =
+  | 'idle'
+  | 'topic_ready'
+  | 'preparing'
+  | 'recording'
+  | 'processing'
+  | 'completed'
+  | 'error';
+
+export type ClaimFlag =
+  | 'correct'
+  | 'partially-correct'
+  | 'unsupported'
+  | 'needs-verification'
+  | 'incorrect'
+  | 'opinion';
+
+export interface Topic {
+  id: string;
+  title: string;
+  category: Category;
+  difficulty: Difficulty;
+  format: PromptFormat;
+  question: string;
+  taskExplanation?: string;
+  hints?: string[];
+  suggestedDurationSec: number;
+  keywords?: string[];
+  source: 'curated' | 'ai-generated';
+  modeContext?: {
+    targetAudience?: string; // for explain-simply e.g. "10-year-old child"
+    debateMotion?: string; // for debate
+    debatePosition?: 'for' | 'against' | 'random';
+    debateRounds?: number;
+    interviewType?:
+      | 'hr'
+      | 'personal-intro'
+      | 'technical'
+      | 'behavioral-star'
+      | 'internship'
+      | 'fresher'
+      | 'leadership'
+      | 'general-communication';
+    situationCategory?:
+      | 'college'
+      | 'teamwork'
+      | 'leadership'
+      | 'conflict-resolution'
+      | 'public-speaking'
+      | 'professional'
+      | 'social'
+      | 'problem-solving'
+      | 'time-management';
+  };
+}
+
+export interface GrammarCorrection {
+  whatSaid: string;
+  correctVersion: string;
+  explanation: string;
+  naturalAlternative?: string;
+}
+
+export interface FactualClaimFlag {
+  claim: string;
+  flag: ClaimFlag;
+  explanation: string;
+  suggestedSourceOrCheck?: string;
+}
+
+export interface DimensionScore {
+  score: number;
+  max: number;
+  feedback: string;
+  evidence: string;
+}
+
+export interface AudioDeliveryMetrics {
+  wordsPerMinute?: number;
+  paceRating?: 'too-slow' | 'ideal' | 'too-fast' | 'uneven' | 'insufficient-data';
+  pauseCount?: number;
+  longestPauseSec?: number;
+  totalSilenceSec?: number;
+  silenceRatioPercent?: number;
+  fillerCount?: number;
+  fillerWordsDetected?: Array<{ word: string; count: number }>;
+  volumeConsistency?: 'consistent' | 'fluctuating' | 'too-quiet' | 'clipping' | 'insufficient-data';
+  audioQualityWarning?: string;
+  reliabilityNote: string;
+  pronunciationObservations?: Array<{ word: string; note: string; timestampSec?: number }>;
+}
+
+export interface PersonalizedExercise {
+  title: string;
+  description: string;
+  targetIssue: string;
+  durationMinutes: number;
+}
+
+export interface RecommendedNextChallenge {
+  category: Category;
+  difficulty: Difficulty;
+  suggestedPrompt: string;
+  rationale: string;
+}
+
+export interface EvaluationReport {
+  id: string;
+  sessionId: string;
+  transcriptScore: number; // 0 - 100
+  performanceLevel: 'Needs Immediate Focus' | 'Developing' | 'Competent' | 'Strong' | 'Exceptional';
+  mainTakeaway: string;
+  dimensionScores: {
+    contentRelevance: DimensionScore; // max 20
+    reasoningEvidence: DimensionScore; // max 15
+    organizationStructure: DimensionScore; // max 15
+    clarityConstruction: DimensionScore; // max 15
+    grammar: DimensionScore; // max 15
+    vocabularyChoice: DimensionScore; // max 10
+    fluencyFillers: DimensionScore; // max 10
+  };
+  strengths: string[]; // max 3, concrete
+  improvementAreas: string[]; // top 3 critical
+  corrections: GrammarCorrection[];
+  reasoningFeedback: {
+    strongestArgument?: string;
+    weakestArgument?: string;
+    missingPoint?: string;
+    unsupportedClaims?: FactualClaimFlag[];
+    betterExample?: string;
+  };
+  betterWaysToSayIt: Array<{
+    original: string;
+    refined: string;
+    whyBetter: string;
+  }>;
+  deliveryMetrics?: AudioDeliveryMetrics;
+  deliveryScore?: {
+    score: number;
+    confidence: 'low' | 'medium' | 'high';
+    coverageNotes: string;
+  };
+  personalizedExercises: PersonalizedExercise[];
+  recommendedNextChallenge: RecommendedNextChallenge;
+  isDemoMode: boolean;
+  evaluationVersion: string;
+  createdAt: string;
+}
+
+export interface DebateTurn {
+  speaker: 'user' | 'ai';
+  roundNumber: number;
+  content: string;
+  timestamp: string;
+  audioMetrics?: Partial<AudioDeliveryMetrics>;
+}
+
+export interface InterviewTurn {
+  interviewerQuestion: string;
+  userAnswer: string;
+  interviewerFollowup?: string;
+  timestamp: string;
+  starEvaluation?: {
+    situationIdentified: boolean;
+    taskIdentified: boolean;
+    actionIdentified: boolean;
+    resultIdentified: boolean;
+    notes: string;
+  };
+  starAnalysis?: any;
+}
+
+export interface PracticeSession {
+  id: string;
+  userId: string;
+  mode: PracticeMode;
+  topic: Topic;
+  status: SessionState;
+  startedAt: string;
+  completedAt?: string;
+  preparationDurationSec?: number;
+  speakingDurationSec?: number;
+  researchNotes?: string;
+  originalTranscript: string; // verbatim, with fillers
+  readableTranscript?: string; // cleaned for reading only
+  audioSaved: boolean;
+  audioBlobUrl?: string;
+  transcriptionProvider: 'browser-webspeech' | 'deepgram' | 'gemini' | 'grok' | 'demo';
+  aiProvider: 'gemini' | 'grok' | 'demo';
+  debateTurns?: DebateTurn[];
+  interviewTurns?: InterviewTurn[];
+  evaluation?: EvaluationReport;
+}
+
+export interface UserProgress {
+  userId: string;
+  totalSessions: number;
+  totalSpeakingTimeSec: number;
+  currentStreakDays: number;
+  lastPracticeDate?: string;
+  averageScore: number;
+  scoreTrend: Array<{ date: string; score: number; mode: PracticeMode }>;
+  grammarImprovementRate: number; // percentage
+  averageWpm: number;
+  frequentGrammarMistakes: Array<{ pattern: string; count: number }>;
+  categoryBreakdown: Record<Category, { completed: number; avgScore: number }>;
+  recentWeaknesses: string[];
+}
+
+export interface ProviderSettings {
+  geminiApiKey: string;
+  grokApiKey: string;
+  deepgramApiKey: string;
+  preferredAiProvider: 'gemini' | 'grok';
+  preferredSttProvider: 'browser-webspeech' | 'deepgram' | 'gemini';
+  retainAudioRecordings: boolean;
+  enableLiveTranscription: boolean;
+  isDemoMode: boolean;
+}
