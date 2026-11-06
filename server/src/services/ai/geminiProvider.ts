@@ -229,10 +229,15 @@ Return strict JSON matching this exact structure:
       dims.grammar.score = Math.min(dims.grammar.score || 15, Math.max(3, 15 - parsed.corrections.length * 3));
     }
 
-    // Set weightedPoints
+    // Set weightedPoints and verify genuine transcript evidence
     for (const key of Object.keys(dims)) {
       if (dims[key]) {
         dims[key].weightedPoints = dims[key].score;
+        if (!dims[key].evidence || !params.transcript.includes(dims[key].evidence)) {
+          dims[key].evidence =
+            localAnalysis.dimensionScores?.[key as keyof typeof localAnalysis.dimensionScores]?.evidence ||
+            'Evaluated across transcript.';
+        }
       }
     }
 
@@ -289,7 +294,7 @@ Return strict JSON matching this exact structure:
       corrections: parsed.corrections || [],
       reasoningFeedback: parsed.reasoningFeedback || {},
       betterWaysToSayIt: parsed.betterWaysToSayIt || [],
-      deliveryMetrics: params.audioMetrics,
+      deliveryMetrics: localAnalysis.deliveryMetrics || params.audioMetrics,
       deliveryScore: params.audioMetrics?.wordsPerMinute
         ? {
             score: Math.min(

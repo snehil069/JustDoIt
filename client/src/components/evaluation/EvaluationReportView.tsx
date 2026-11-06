@@ -535,7 +535,17 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
             <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Speaking Pace</span>
             <div className="text-2xl font-light font-mono text-[#252525]">
-              {report.deliveryMetrics?.wordsPerMinute || 135} <span className="text-xs font-normal">WPM</span>
+              {report.deliveryMetrics?.wordsPerMinute !== undefined ? (
+                <>
+                  {report.deliveryMetrics.wordsPerMinute} <span className="text-xs font-normal">WPM</span>
+                </>
+              ) : session.speakingDurationSec && session.speakingDurationSec > 0 ? (
+                <>
+                  {Math.round(((session.originalTranscript || '').trim().split(/\s+/).filter(Boolean).length / (session.speakingDurationSec / 60)))} <span className="text-xs font-normal">WPM</span>
+                </>
+              ) : (
+                'N/A'
+              )}
             </div>
             <p className="text-xs text-[#666666] pt-1">
               Target: 125–155 WPM
@@ -545,21 +555,29 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
             <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Pauses Detected</span>
             <div className="text-2xl font-light font-mono text-[#252525]">
-              {report.deliveryMetrics?.pauseCount || 0} Pauses
+              {report.deliveryMetrics?.pauseCount !== undefined
+                ? `${report.deliveryMetrics.pauseCount} Pauses`
+                : 'N/A'}
             </div>
             <p className="text-xs text-[#666666] pt-1">
-              Silence intervals between thoughts
+              {report.deliveryMetrics?.pauseCount !== undefined
+                ? 'Silence intervals between thoughts'
+                : 'Acoustic pause analysis not available'}
             </p>
           </div>
 
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
             <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Fillers Count</span>
             <div className="text-2xl font-light font-mono text-[#252525]">
-              {report.deliveryMetrics?.fillerCount || 0} Fillers
+              {report.deliveryMetrics?.fillerCount !== undefined
+                ? `${report.deliveryMetrics.fillerCount} Fillers`
+                : '0 Fillers'}
             </div>
             <p className="text-xs text-[#666666] pt-1">
               {report.deliveryMetrics?.fillerCount && report.deliveryMetrics.fillerCount > 3
                 ? 'High hesitation sound count'
+                : report.deliveryMetrics?.fillerCount === 0
+                ? 'Zero hesitation sounds detected'
                 : 'Controlled articulation'}
             </p>
           </div>
@@ -567,10 +585,14 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
             <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Volume Consistency</span>
             <div className="text-2xl font-light font-mono text-[#252525] capitalize">
-              {report.deliveryMetrics?.volumeConsistency || 'Normal'}
+              {report.deliveryMetrics?.volumeConsistency && report.deliveryMetrics.volumeConsistency !== 'insufficient-data'
+                ? report.deliveryMetrics.volumeConsistency
+                : 'Not Available'}
             </div>
             <p className="text-xs text-[#666666] pt-1">
-              Web Audio dynamic range analysis
+              {report.deliveryMetrics?.volumeConsistency && report.deliveryMetrics.volumeConsistency !== 'insufficient-data'
+                ? 'Web Audio dynamic range analysis'
+                : 'Audio signal not captured for dynamic range'}
             </p>
           </div>
         </div>

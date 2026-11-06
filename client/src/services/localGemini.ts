@@ -261,10 +261,15 @@ Return strict JSON matching this exact structure:
         dims.grammar.score = Math.min(dims.grammar.score || 15, Math.max(3, 15 - parsed.corrections.length * 3));
       }
 
-      // Set weightedPoints explicitly
+      // Set weightedPoints explicitly and verify evidence is genuine substring
       for (const key of Object.keys(dims)) {
         if (dims[key]) {
           dims[key].weightedPoints = dims[key].score;
+          if (!dims[key].evidence || !params.transcript.includes(dims[key].evidence)) {
+            dims[key].evidence =
+              localAnalysis.dimensionScores?.[key as keyof typeof localAnalysis.dimensionScores]?.evidence ||
+              'Evaluated across transcript.';
+          }
         }
       }
 
@@ -287,13 +292,14 @@ Return strict JSON matching this exact structure:
       parsed.strengths = (parsed.detailedStrengths || []).map((s: any) => `${s.title}: ${s.evidence}`);
       parsed.improvementAreas = (parsed.detailedWeaknesses || []).map((w: any) => `${w.title}: ${w.evidence}`);
 
-      // 5. Guarantee improvement plan and coach summary
+      // 5. Guarantee improvement plan, coach summary, and delivery metrics
       if (!parsed.improvementPlan || parsed.improvementPlan.length === 0) {
         parsed.improvementPlan = localAnalysis.improvementPlan || [];
       }
       if (!parsed.coachSummary) {
         parsed.coachSummary = localAnalysis.coachSummary;
       }
+      parsed.deliveryMetrics = localAnalysis.deliveryMetrics;
 
       const computedTotal =
         (dims.contentRelevance?.score || 0) +

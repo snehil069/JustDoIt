@@ -449,51 +449,93 @@ export class MultiStageAnalyzer {
         }
       });
     });
-    // Add domain-specific terms from prompt
-    ['copilot', 'chatgpt', 'ai', 'pedagogy', 'debugging', 'syntax', 'programming', 'programmer', 'code', 'coding', 'software'].forEach(
-      (term) => coreDomainKeywords.add(term)
-    );
+
+    // Also extract substantive terms from title and question (length >= 4, not in stopWords)
+    `${topic.title} ${topic.question}`
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .forEach((term) => {
+        if (
+          term.length >= 4 &&
+          !stopWords.has(term) &&
+          !['computer', 'student', 'students', 'people', 'person', 'tools', 'things'].includes(term)
+        ) {
+          coreDomainKeywords.add(term);
+        }
+      });
 
     const matchedCore = Array.from(coreDomainKeywords).filter((k) => lower.includes(k));
     const isCompletelyOffTopic = matchedCore.length === 0;
 
-    // Structured Topic Dimensions
+    // Dynamically derive expected dimensions from the actual topic & question
     const expectedDimensions: Array<{
       dimension: string;
       keywords: string[];
       importance: 'essential' | 'recommended' | 'optional';
       whyImportant: string;
       howToAddress: string;
-    }> = [
-      {
-        dimension: 'Pedagogical Impact & Foundational Mechanics',
-        keywords: ['pedagogy', 'learning', 'understand', 'mental model', 'foundation', 'curriculum', 'education', 'teach', 'basics'],
+    }> = [];
+
+    // If the topic provides explicit hints, generate question-specific dimensions from them
+    if (topic.hints && topic.hints.length >= 2) {
+      topic.hints.forEach((hint, idx) => {
+        const hintClean = hint.trim();
+        const hintTerms = hintClean
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, ' ')
+          .split(/\s+/)
+          .filter((w) => w.length > 3 && !stopWords.has(w));
+        expectedDimensions.push({
+          dimension: hintClean,
+          keywords: hintTerms.length > 0 ? hintTerms : [hintClean.toLowerCase()],
+          importance: idx === 0 ? 'essential' : idx === 1 ? 'essential' : 'recommended',
+          whyImportant: `Prompt guidelines specifically recommend examining "${hintClean}" to build a comprehensive answer.`,
+          howToAddress: `Dedicate a focused 2-3 sentence segment analyzing "${hintClean}" with a concrete example.`,
+        });
+      });
+    }
+
+    // If no hints or < 2 hints, dynamically generate question-specific dimensions based on title & question
+    if (expectedDimensions.length < 2) {
+      const substantiveTitleTerms = topic.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !stopWords.has(w));
+
+      expectedDimensions.push({
+        dimension: `Core Thesis & Stance: ${topic.title}`,
+        keywords: substantiveTitleTerms.length > 0 ? substantiveTitleTerms : [topic.title.toLowerCase()],
         importance: 'essential',
-        whyImportant: 'Evaluating how tools reshape cognitive understanding rather than just superficial speed is the crux of the topic.',
-        howToAddress: 'Contrast early syntax memorization with the development of conceptual mental models and algorithmic intuition.',
-      },
-      {
-        dimension: 'Cognitive Offloading vs Debugging Resilience',
-        keywords: ['debugging', 'error', 'investigate', 'offload', 'boilerplate', 'struggle', 'resilience', 'problem-solving', 'trace'],
+        whyImportant: `A clear, unambiguous opening stance directly addressing "${topic.title}" anchors your speech and prevents wandering.`,
+        howToAddress: `State your decisive thesis on ${topic.title} within your opening 15 seconds.`,
+      });
+
+      expectedDimensions.push({
+        dimension: 'Causal Reasoning & Real-World Evidence',
+        keywords: ['because', 'reason', 'example', 'instance', 'evidence', 'specifically', 'result', 'since', 'due to'],
         importance: 'essential',
-        whyImportant: 'Real engineering ability is proven when debugging complex failures that automated tools cannot resolve.',
-        howToAddress: 'Discuss how automated completions alter the trial-and-error struggle necessary to build deep debugging stamina.',
-      },
-      {
-        dimension: 'Industry Readiness & Assessment Adaptations',
-        keywords: ['interview', 'industry', 'exam', 'assessment', 'architectural', 'evaluation', 'workplace', 'employability', 'hire'],
+        whyImportant: 'Unsubstantiated opinions fail to persuade; claims must be backed by causal explanation ("why") and concrete evidence.',
+        howToAddress: 'Anchor your main claim by citing a real-world scenario, organizational case study, or concrete mechanism.',
+      });
+
+      expectedDimensions.push({
+        dimension: 'Trade-offs, Limitations & Nuances',
+        keywords: ['however', 'although', 'trade-off', 'contrast', 'balance', 'challenge', 'risk', 'counter', 'limitation', 'whereas'],
         importance: 'recommended',
-        whyImportant: 'Educational models must align with changing hiring practices and real-world software architecture roles.',
-        howToAddress: 'Recommend how universities should restructure assessments towards code review, architecture, and live explanation.',
-      },
-      {
-        dimension: 'Ethical & Academic Integrity Considerations',
-        keywords: ['ethics', 'integrity', 'cheat', 'plagiarism', 'attribution', 'policy', 'guidelines'],
+        whyImportant: 'Mature articulation acknowledges counterarguments, operational limitations, and context-dependent trade-offs.',
+        howToAddress: 'Address the most compelling counterargument or practical friction point before reaffirming your stance.',
+      });
+
+      expectedDimensions.push({
+        dimension: 'Actionable Resolution & Strategic Takeaway',
+        keywords: ['solution', 'future', 'implement', 'strategy', 'recommend', 'ultimately', 'conclude', 'adapt', 'step'],
         importance: 'optional',
-        whyImportant: 'Clear ethical boundaries ensure students use AI as a collaborator rather than an opaque proxy.',
-        howToAddress: 'Address institutional policies around transparent AI disclosure and authentic student authorship.',
-      },
-    ];
+        whyImportant: 'A strong conclusion synthesizes the argument into an actionable takeaway rather than trailing off.',
+        howToAddress: 'End with a forward-looking summary or concrete recommendation for action.',
+      });
+    }
 
     const missedPoints: MissedPoint[] = [];
     let coveredDimensionCount = 0;
@@ -525,56 +567,137 @@ export class MultiStageAnalyzer {
   }
 
   /**
-   * Stage C: Reasoning, logic and evidence scrutiny
+   * Stage C: Evidence & Argument Extraction
+   * Extracts distinct, genuine substrings from transcript for each evaluation criterion.
+   * Guarantees that no short opening snippet (e.g. "First of all, I") is reused across unrelated dimensions.
    */
-  public static analyzeReasoning(
+  public static extractEvidence(
     sentences: string[],
-    transcript: string
+    transcript: string,
+    topic: Topic,
+    corrections: GrammarCorrection[],
+    unsupportedClaims: Array<{ claim: string; flag: any; explanation: string }>,
+    foundTransitions: string[]
   ): {
+    contentEvidence: string;
+    reasoningEvidence: string;
+    organizationEvidence: string;
+    clarityEvidence: string;
+    grammarEvidence: string;
     strongestArgument: string;
     weakestArgument: string;
-    unsupportedClaims: Array<{ claim: string; flag: any; explanation: string }>;
     betterExample: string;
   } {
-    const unsupportedClaims: Array<{ claim: string; flag: any; explanation: string }> = [];
+    const validSentences = sentences
+      .map((s) => s.trim())
+      .filter((s) => s.length > 5 && transcript.includes(s));
 
-    // Scan for dangerous overgeneralizations
-    const generalizations = [
-      { pattern: /\b(everyone\s+knows|all\s+people\s+think|nobody\s+cares|always\s+fails|everyone\s+is)\b/i, explanation: 'Sweeping generalization presented as fact without statistical or contextual qualification.' },
-      { pattern: /\b(it\s+is\s+obvious\s+that|obviously)\b/i, explanation: 'Using "obviously" sidesteps the need for logical evidence.' },
-      { pattern: /\b(they\s+just\s+waste|total\s+waste\s+of\s+time)\b/i, explanation: 'Dismissive assertion lacking causal breakdown or balanced analysis.' },
-    ];
+    const usedQuotes = new Set<string>();
 
-    for (const s of sentences) {
-      for (const gen of generalizations) {
-        if (gen.pattern.test(s)) {
-          unsupportedClaims.push({
-            claim: s,
-            flag: 'unsupported',
-            explanation: gen.explanation,
-          });
-        }
+    const pickQuote = (candidate?: string, fallbackNote?: string): string => {
+      if (candidate && transcript.includes(candidate) && !usedQuotes.has(candidate)) {
+        usedQuotes.add(candidate);
+        return candidate;
+      }
+      // If candidate was already used or invalid, look for another valid unused sentence
+      const alternate = validSentences.find((s) => !usedQuotes.has(s) && s.length >= 15);
+      if (alternate) {
+        usedQuotes.add(alternate);
+        return alternate;
+      }
+      return fallbackNote || 'Insufficient distinct transcript evidence.';
+    };
+
+    // 1. Content Relevance Evidence: Find sentence with highest prompt keyword overlap
+    const stopWords = new Set(['what', 'when', 'where', 'which', 'who', 'why', 'how', 'this', 'that', 'from', 'with']);
+    const topicTerms = `${topic.title} ${topic.question}`
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !stopWords.has(w));
+
+    let bestContentSentence: string | undefined;
+    let maxMatches = 0;
+    for (const s of validSentences) {
+      const lower = s.toLowerCase();
+      const count = topicTerms.filter((term) => lower.includes(term)).length;
+      if (count > maxMatches) {
+        maxMatches = count;
+        bestContentSentence = s;
       }
     }
+    const contentEvidence = pickQuote(
+      bestContentSentence,
+      'Insufficient transcript evidence directly addressing the core prompt.'
+    );
 
-    // Select strongest and weakest arguments
-    const strongestArgument =
-      sentences.find((s) => s.length > 40 && /\b(because|therefore|consequently|as a result)\b/i.test(s)) ||
-      sentences[0] ||
-      'Direct opening engagement with the prompt.';
+    // 2. Reasoning Evidence: Sentence with causal reasoning markers
+    const causalRegex = /\b(because|since|therefore|as a result|consequently|for instance|for example|leads to|due to|specifically)\b/i;
+    const bestReasoningSentence = validSentences.find((s) => causalRegex.test(s));
+    const reasoningEvidence = pickQuote(
+      bestReasoningSentence || (unsupportedClaims.length > 0 ? unsupportedClaims[0].claim : undefined),
+      'No causal explanations or verifiable evidence markers identified in transcript.'
+    );
 
-    const weakestArgument =
-      unsupportedClaims[0]?.claim ||
-      sentences.find((s) => s.length < 25 && !/\b(because|for example)\b/i.test(s)) ||
-      (sentences.length > 1 ? sentences[sentences.length - 1] : 'Premature conclusion without supporting reasoning.');
+    // 3. Organization Evidence: Sentence with structural transition markers
+    const transitionRegex = /\b(firstly|secondly|furthermore|however|moreover|on the other hand|in addition|finally|in conclusion|ultimately|in contrast)\b/i;
+    const bestOrgSentence = validSentences.find((s) => transitionRegex.test(s));
+    const organizationEvidence = pickQuote(
+      bestOrgSentence,
+      foundTransitions.length > 0
+        ? `Used transition marker "${foundTransitions[0]}".`
+        : 'No structural transitions or signposts used in the response.'
+    );
+
+    // 4. Clarity Evidence: Distinct sentence evaluated for syntax and readability
+    const bestClaritySentence = validSentences.find((s) => !usedQuotes.has(s) && s.length >= 25);
+    const clarityEvidence = pickQuote(
+      bestClaritySentence,
+      'Phrasing evaluated across complete response.'
+    );
+
+    // 5. Grammar Evidence: Sentence containing detected grammar error or clean sentence
+    let grammarEvidence: string;
+    if (corrections.length > 0 && corrections[0].whatSaid && transcript.includes(corrections[0].whatSaid)) {
+      grammarEvidence = corrections[0].whatSaid;
+    } else {
+      const cleanSentence = validSentences.find((s) => !usedQuotes.has(s) && s.length >= 20);
+      grammarEvidence = cleanSentence || 'No grammatical violations detected in response.';
+    }
+
+    // 6. Strongest Argument: Substantive sentence (> 30 chars) with causal or logical connector
+    const substantiveSentences = validSentences.filter((s) => s.length >= 30);
+    const strongestCandidate =
+      substantiveSentences.find((s) => causalRegex.test(s)) ||
+      substantiveSentences[0] ||
+      validSentences[0];
+    const strongestArgument = strongestCandidate || 'Direct opening engagement with the prompt.';
+
+    // 7. Weakest Argument: Unsupported claim or fragmented/hasty conclusion
+    let weakestCandidate = unsupportedClaims[0]?.claim;
+    if (!weakestCandidate || weakestCandidate === strongestArgument) {
+      weakestCandidate = validSentences.find(
+        (s) => s !== strongestArgument && s.length < 25 && !causalRegex.test(s)
+      );
+    }
+    if (!weakestCandidate || weakestCandidate === strongestArgument) {
+      weakestCandidate = validSentences.length > 1
+        ? validSentences[validSentences.length - 1]
+        : 'Single brief statement lacks supporting reasoning.';
+    }
+    const weakestArgument = weakestCandidate;
 
     const betterExample =
-      'Instead of generic statements, cite an empirical or organizational benchmark: e.g., how engineering teams balance rapid deployment vs testing rigor, or how students schedule deep work blocks amidst constant notifications.';
+      `Instead of broad assertions, anchor your position on ${topic.title} with an empirical benchmark, organizational case study, or concrete trade-off scenario.`;
 
     return {
+      contentEvidence,
+      reasoningEvidence,
+      organizationEvidence,
+      clarityEvidence,
+      grammarEvidence,
       strongestArgument,
       weakestArgument,
-      unsupportedClaims,
       betterExample,
     };
   }
@@ -618,8 +741,24 @@ export class MultiStageAnalyzer {
     // 3. Stage B: Topic Decomposition & Missed Points
     const { matchedKeywords, missedPoints, coverageScoreRatio, isCompletelyOffTopic } = this.analyzeTopicCoverage(topic, transcript);
 
-    // 4. Stage C: Reasoning & Critical Thinking
-    const reasoning = this.analyzeReasoning(rawSentences, transcript);
+    // 4. Stage C: Reasoning, Logic & Evidence Extraction
+    const generalizations = [
+      { pattern: /\b(everyone\s+knows|all\s+people\s+think|nobody\s+cares|always\s+fails|everyone\s+is)\b/i, explanation: 'Sweeping generalization presented as fact without statistical or contextual qualification.' },
+      { pattern: /\b(it\s+is\s+obvious\s+that|obviously)\b/i, explanation: 'Using "obviously" sidesteps the need for logical evidence.' },
+      { pattern: /\b(they\s+just\s+waste|total\s+waste\s+of\s+time)\b/i, explanation: 'Dismissive assertion lacking causal breakdown or balanced analysis.' },
+    ];
+    const unsupportedClaims: Array<{ claim: string; flag: any; explanation: string }> = [];
+    for (const s of rawSentences) {
+      for (const gen of generalizations) {
+        if (gen.pattern.test(s)) {
+          unsupportedClaims.push({
+            claim: s,
+            flag: 'unsupported',
+            explanation: gen.explanation,
+          });
+        }
+      }
+    }
 
     // 5. Stage D: Transitions & Structure
     const transitionMarkers = [
@@ -630,6 +769,16 @@ export class MultiStageAnalyzer {
     ];
     const foundTransitions = transitionMarkers.filter((m) =>
       transcript.toLowerCase().includes(m)
+    );
+
+    // Extract verified, distinct evidence across all dimensions
+    const evidenceReport = this.extractEvidence(
+      rawSentences,
+      transcript,
+      topic,
+      corrections,
+      unsupportedClaims,
+      foundTransitions
     );
 
     // Repetitive vocabulary analysis
@@ -644,15 +793,6 @@ export class MultiStageAnalyzer {
     const isHighlyRepetitive = wordCount >= 30 && maxFreq / wordCount > 0.09;
 
     // 6. SCORING ENGINE: Strict Weighted Rubric (Total 100)
-    // -------------------------------------------------------------
-    // Dim 1: Content Relevance & Accuracy (Weight: 20)
-    // Dim 2: Reasoning, Examples & Evidence (Weight: 15)
-    // Dim 3: Organisation & Logical Flow (Weight: 15)
-    // Dim 4: Clarity & Sentence Construction (Weight: 15)
-    // Dim 5: Grammar & Syntax (Weight: 15)
-    // Dim 6: Vocabulary & Word Choice (Weight: 10)
-    // Dim 7: Verbal Fluency & Repetition (Weight: 10)
-
     let contentScore: number;
     let reasoningScore: number;
     let orgScore: number;
@@ -679,12 +819,11 @@ export class MultiStageAnalyzer {
 
     const isHighDensityStructured =
       wordCount >= 50 &&
-      coverageScoreRatio > 0.3 &&
+      coverageScoreRatio >= 0.25 &&
       corrections.length === 0 &&
       foundRhetorical.length >= 1;
 
     if (isSeverelyOffTopic) {
-      // Off-topic penalty
       contentScore = 3;
       reasoningScore = 3;
       orgScore = 3;
@@ -693,7 +832,6 @@ export class MultiStageAnalyzer {
       vocabScore = 3;
       fluencyScore = 4;
     } else if (wordCount < 18) {
-      // Incomplete / Aborted speech (<18 words)
       contentScore = 4;
       reasoningScore = 3;
       orgScore = 3;
@@ -702,16 +840,14 @@ export class MultiStageAnalyzer {
       vocabScore = 2;
       fluencyScore = 3;
     } else if (isHighDensityStructured) {
-      // Sophisticated, dense response (e.g. Test 1, Test 8)
       contentScore = Math.min(20, Math.round(15 + coverageScoreRatio * 4));
-      reasoningScore = reasoning.unsupportedClaims.length > 0 ? 11 : 14;
+      reasoningScore = unsupportedClaims.length > 0 ? 11 : 14;
       orgScore = foundRhetorical.length >= 2 ? 14 : 13;
       clarityScore = 13;
       grammarScore = 15;
       vocabScore = lexicalDiversity > 0.6 ? 9 : 8;
       fluencyScore = wpm >= 115 && wpm <= 165 ? 9 : 8;
     } else if (wordCount < 40) {
-      // Very brief / severely underdeveloped
       contentScore = Math.min(10, Math.round(6 + coverageScoreRatio * 4));
       reasoningScore = 5;
       orgScore = 5;
@@ -720,9 +856,8 @@ export class MultiStageAnalyzer {
       vocabScore = 4;
       fluencyScore = 5;
     } else if (wordCount < 75) {
-      // Below average
       contentScore = Math.min(14, Math.round(9 + coverageScoreRatio * 5));
-      reasoningScore = reasoning.unsupportedClaims.length > 0 ? 7 : 9;
+      reasoningScore = unsupportedClaims.length > 0 ? 7 : 9;
       orgScore = foundTransitions.length >= 1 ? 9 : 7;
       clarityScore = 9;
       grammarScore = Math.max(4, 13 - corrections.length * 3);
@@ -730,48 +865,39 @@ export class MultiStageAnalyzer {
       fluencyScore = fillerRatio > 0.05 ? 5 : 7;
       if (isHighlyRepetitive) reasoningScore = Math.min(reasoningScore, 5);
     } else {
-      // Full speech (75+ words)
-      // Content (max 20)
       if (coverageScoreRatio > 0.7) contentScore = 18;
       else if (coverageScoreRatio > 0.4) contentScore = 15;
       else contentScore = 11;
 
-      // Reasoning (max 15)
-      if (reasoning.unsupportedClaims.length >= 2) reasoningScore = 8;
-      else if (reasoning.unsupportedClaims.length === 1) reasoningScore = 10;
+      if (unsupportedClaims.length >= 2) reasoningScore = 8;
+      else if (unsupportedClaims.length === 1) reasoningScore = 10;
       else if (foundTransitions.includes('because') || foundTransitions.includes('therefore') || foundTransitions.includes('consequently')) reasoningScore = 13;
       else reasoningScore = 11;
 
-      // Organization (max 15)
       if (foundTransitions.length >= 3) orgScore = 14;
       else if (foundTransitions.length >= 1) orgScore = 11;
       else orgScore = 8;
 
-      // Clarity (max 15)
       clarityScore = 12;
       if (wpm < 95 || wpm > 180) clarityScore = Math.max(6, clarityScore - 3);
 
-      // Grammar (max 15): Strictly deducted based on identified errors
       if (corrections.length === 0) grammarScore = 15;
       else if (corrections.length === 1) grammarScore = 12;
       else if (corrections.length === 2) grammarScore = 9;
       else if (corrections.length <= 4) grammarScore = 6;
       else grammarScore = 3;
 
-      // Vocabulary (max 10)
       if (isHighlyRepetitive) vocabScore = 3;
       else if (lexicalDiversity > 0.6) vocabScore = 9;
       else if (lexicalDiversity > 0.45) vocabScore = 7;
       else vocabScore = 5;
 
-      // Fluency (max 10)
       if (fillerRatio > 0.07) fluencyScore = 4;
       else if (fillerRatio > 0.03) fluencyScore = 6;
       else if (wpm >= 115 && wpm <= 165) fluencyScore = 9;
       else fluencyScore = 7;
     }
 
-    // Programmatic Weighted Points & Final Total Calculation
     const totalScore = Math.min(
       100,
       Math.max(
@@ -786,7 +912,6 @@ export class MultiStageAnalyzer {
       )
     );
 
-    // Performance Band Assignment
     let performanceLevel: EvaluationReport['performanceLevel'] = 'Competent';
     if (totalScore >= 85) performanceLevel = 'Exceptional';
     else if (totalScore >= 72) performanceLevel = 'Strong';
@@ -806,7 +931,7 @@ export class MultiStageAnalyzer {
     if (matchedKeywords.length > 0) {
       detailedStrengths.push({
         title: 'Prompt Engagement & Keyword Focus',
-        evidence: `Directly referenced core concepts: "${matchedKeywords.slice(0, 3).join('", "')}".`,
+        evidence: `Referenced core prompt concepts: "${matchedKeywords.slice(0, 3).join('", "')}".`,
         impactOrWhy: 'Ensured the response remained connected to the specific challenge prompt.',
       });
     }
@@ -820,15 +945,15 @@ export class MultiStageAnalyzer {
     if (corrections.length === 0 && wordCount >= 30) {
       detailedStrengths.push({
         title: 'Clean Grammatical Execution',
-        evidence: rawSentences[0] || transcript.slice(0, 40),
+        evidence: `Zero grammatical errors detected across ${wordCount} words.`,
         impactOrWhy: 'Maintained syntactical consistency without disruptive agreement or tense breaks.',
       });
     }
     if (detailedStrengths.length === 0) {
       detailedStrengths.push({
-        title: 'Audible Spoken Effort',
-        evidence: rawSentences[0] || transcript.slice(0, 40),
-        impactOrWhy: 'Attempted the challenge directly under practice conditions.',
+        title: 'Prompt Engagement Effort',
+        evidence: `Delivered ${wordCount} words on "${topic.title}".`,
+        impactOrWhy: 'Attempted the speaking challenge directly under practice conditions.',
       });
     }
 
@@ -852,17 +977,17 @@ export class MultiStageAnalyzer {
     if (missedPoints.length > 0) {
       detailedWeaknesses.push({
         title: `Missed Critical Dimension: ${missedPoints[0].point}`,
-        evidence: 'Prompt required balanced exploration of the central question.',
+        evidence: `Topic "${topic.title}" benefits from addressing this dimension.`,
         impactOrWhy: missedPoints[0].whyImportant,
         actionableStep: missedPoints[0].howToIncorporate,
       });
     }
-    if (reasoning.unsupportedClaims.length > 0) {
+    if (unsupportedClaims.length > 0) {
       detailedWeaknesses.push({
         title: 'Unsupported Generalization in Argument',
-        evidence: `"${reasoning.unsupportedClaims[0].claim}"`,
-        impactOrWhy: reasoning.unsupportedClaims[0].explanation,
-        actionableStep: 'Qualify statements: replace "everyone" with "many individuals" and explain why.',
+        evidence: `"${unsupportedClaims[0].claim}"`,
+        impactOrWhy: unsupportedClaims[0].explanation,
+        actionableStep: 'Qualify statements: replace sweeping absolutes with measured context and evidence.',
       });
     }
     if (fillerCount >= 3) {
@@ -883,7 +1008,7 @@ export class MultiStageAnalyzer {
       },
       {
         original: rawSentences.length > 1 ? rawSentences[1] : 'And another thing is...',
-        refined: `Furthermore, a critical factor to consider is how this dynamic influences observed outcomes.`,
+        refined: `Furthermore, a critical factor to examine is how this dynamic influences observed outcomes in practice.`,
         whyBetter: 'Replaces colloquial conversational phrasing with structured analytical connective tissue.',
       },
     ];
@@ -954,17 +1079,17 @@ export class MultiStageAnalyzer {
             matchedKeywords.length > 0
               ? `Engaged with prompt themes (${matchedKeywords.slice(0, 3).join(', ')}). Missed ${missedPoints.length} core analytical dimensions.`
               : 'Failed to directly anchor arguments in the core subject of the challenge prompt.',
-          evidence: rawSentences[0] || transcript.slice(0, 60),
+          evidence: evidenceReport.contentEvidence,
         },
         reasoningEvidence: {
           score: reasoningScore,
           max: 15,
           weightedPoints: reasoningScore,
           feedback:
-            reasoning.unsupportedClaims.length > 0
-              ? `Contained ${reasoning.unsupportedClaims.length} unsupported claim(s). Requires causal backing ("because...") and real-world examples.`
-              : 'Arguments were comprehensible, but would benefit from a verifiable case study.',
-          evidence: reasoning.unsupportedClaims[0]?.claim || rawSentences[0] || transcript.slice(0, 50),
+            unsupportedClaims.length > 0
+              ? `Contained ${unsupportedClaims.length} unsupported claim(s). Requires causal backing ("because...") and real-world examples.`
+              : 'Arguments were structured, but would benefit from verifiable empirical benchmarks.',
+          evidence: evidenceReport.reasoningEvidence,
         },
         organizationStructure: {
           score: orgScore,
@@ -974,7 +1099,7 @@ export class MultiStageAnalyzer {
             foundTransitions.length > 0
               ? `Utilized transition signposts: "${foundTransitions.slice(0, 3).join(', ')}".`
               : 'Lacks structural scaffolding. Use Point-Reason-Example-Point hierarchy.',
-          evidence: foundTransitions[0] || (rawSentences.length > 1 ? rawSentences[1] : 'Sequential phrasing'),
+          evidence: evidenceReport.organizationEvidence,
         },
         clarityConstruction: {
           score: clarityScore,
@@ -983,8 +1108,8 @@ export class MultiStageAnalyzer {
           feedback:
             wpm < 95
               ? `Pace was halting (${wpm} WPM). Keep sentences under 25 words for listener retention.`
-              : 'Phrasing was generally intelligible with clean sentence boundaries.',
-          evidence: rawSentences[0] || transcript.slice(0, 40),
+              : 'Phrasing was intelligible with clear sentence boundaries.',
+          evidence: evidenceReport.clarityEvidence,
         },
         grammar: {
           score: grammarScore,
@@ -994,10 +1119,7 @@ export class MultiStageAnalyzer {
             corrections.length > 0
               ? `Penalized for ${corrections.length} grammatical violation(s): ${corrections.map((c) => c.errorType).slice(0, 2).join(', ')}.`
               : 'No grammatical or syntactical violations detected in this transcript sample.',
-          evidence:
-            corrections.length > 0
-              ? corrections[0].whatSaid
-              : rawSentences[0] || transcript.slice(0, 40),
+          evidence: evidenceReport.grammarEvidence,
         },
         vocabularyChoice: {
           score: vocabScore,
@@ -1021,6 +1143,15 @@ export class MultiStageAnalyzer {
               : 'No prominent vocalized fillers',
         },
       },
+      deliveryMetrics: {
+        wordsPerMinute: wpm,
+        pauseCount: audioMetrics?.pauseCount,
+        longestPauseSec: audioMetrics?.longestPauseSec,
+        totalSilenceSec: audioMetrics?.totalSilenceSec,
+        fillerCount,
+        volumeConsistency: audioMetrics?.volumeConsistency,
+        reliabilityNote: audioMetrics?.reliabilityNote || (durationSec > 0 ? 'Calculated from transcript words and duration' : 'Text input analysis'),
+      },
       strengths: detailedStrengths.map((s) => `${s.title}: ${s.evidence}`),
       improvementAreas: detailedWeaknesses.map((w) => `${w.title}: ${w.evidence}`),
       detailedStrengths,
@@ -1030,11 +1161,11 @@ export class MultiStageAnalyzer {
       coachSummary,
       corrections,
       reasoningFeedback: {
-        strongestArgument: reasoning.strongestArgument,
-        weakestArgument: reasoning.weakestArgument,
+        strongestArgument: evidenceReport.strongestArgument,
+        weakestArgument: evidenceReport.weakestArgument,
         missingPoint: missedPoints[0]?.point,
-        unsupportedClaims: reasoning.unsupportedClaims,
-        betterExample: reasoning.betterExample,
+        unsupportedClaims,
+        betterExample: evidenceReport.betterExample,
       },
       betterWaysToSayIt: betterWays,
       personalizedExercises: [
@@ -1058,7 +1189,7 @@ export class MultiStageAnalyzer {
         rationale: 'Addresses your identified reasoning and structural gaps under timed conditions.',
       },
       isDemoMode: true,
-      evaluationVersion: '3.0.0-multi-stage',
+      evaluationVersion: '3.1.0-calibrated',
       createdAt: new Date().toISOString(),
     };
   }
