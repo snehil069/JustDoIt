@@ -6,6 +6,7 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   envDir: path.resolve(__dirname, '..'),
+  envPrefix: ['VITE_', 'SUPABASE_', 'NEXT_PUBLIC_'],
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../shared'),
