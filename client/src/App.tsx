@@ -64,6 +64,14 @@ export function App() {
     setProgress(loadedProgress);
     setSessions(loadedSessions);
 
+    // Sync with Supabase if configured
+    storageService.syncWithSupabase().then((data) => {
+      if (data) {
+        setSessions(data.sessions);
+        setProgress(data.progress);
+      }
+    });
+
     // Check server settings to adopt server-configured providers
     fetch('/api/settings')
       .then((res) => res.json())

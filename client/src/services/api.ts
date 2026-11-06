@@ -11,7 +11,9 @@ import {
 } from '@shared/types/index';
 import { storageService } from './storage';
 
-const API_BASE = '/api';
+const API_BASE = (import.meta as any).env?.VITE_API_URL
+  ? `${(import.meta as any).env.VITE_API_URL}/api`
+  : '/api';
 
 export const api = {
   async getHealth() {

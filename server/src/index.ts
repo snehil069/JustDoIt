@@ -279,3 +279,6 @@ server.listen(PORT, () => {
   console.log(`🤖 Gemini API Key: ${config.geminiApiKey ? 'Configured' : 'Missing (Demo Mode Active)'}`);
   console.log(`🎙️ Deepgram API Key: ${config.deepgramApiKey ? 'Configured' : 'Missing (Web Speech Fallback Active)'}`);
 });
+
+export { app, server };
+export default app;

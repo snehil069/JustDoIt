@@ -1,4 +1,5 @@
 import { PracticeSession, UserProgress, ProviderSettings, EvaluationReport } from '@shared/types/index';
+import { supabaseService, isSupabaseConfigured } from './supabase';
 
 const SETTINGS_KEY = 'speakup_settings_v1';
 const SESSIONS_KEY = 'speakup_sessions_v1';
@@ -93,6 +94,10 @@ class StorageService {
     try {
       localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
       this.updateProgressFromSession(session);
+      // Sync to Supabase in background
+      if (isSupabaseConfigured) {
+        supabaseService.saveSession(session).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to save session:', e);
     }
@@ -103,8 +108,37 @@ class StorageService {
     try {
       localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
       this.recalculateAllProgress();
+      // Sync deletion to Supabase
+      if (isSupabaseConfigured) {
+        supabaseService.deleteSession(id).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to delete session:', e);
+    }
+  }
+
+  public async syncWithSupabase(): Promise<{ sessions: PracticeSession[]; progress: UserProgress } | null> {
+    if (!isSupabaseConfigured) return null;
+    try {
+      const [remoteSessions, remoteProgress] = await Promise.all([
+        supabaseService.getSessions(),
+        supabaseService.getProgress(),
+      ]);
+
+      if (remoteSessions && remoteSessions.length > 0) {
+        localStorage.setItem(SESSIONS_KEY, JSON.stringify(remoteSessions));
+      }
+      if (remoteProgress) {
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(remoteProgress));
+      }
+
+      return {
+        sessions: this.getSessions(),
+        progress: this.getProgress(),
+      };
+    } catch (err) {
+      console.warn('Supabase sync skipped:', err);
+      return null;
     }
   }
 
@@ -163,6 +197,9 @@ class StorageService {
 
     try {
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+      if (isSupabaseConfigured) {
+        supabaseService.saveProgress(progress).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to update progress:', e);
     }
@@ -191,6 +228,9 @@ class StorageService {
 
     try {
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+      if (isSupabaseConfigured) {
+        supabaseService.saveProgress(progress).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to reset progress:', e);
     }

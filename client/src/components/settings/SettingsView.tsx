@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ProviderSettings } from '@shared/types/index';
 import { storageService } from '../../services/storage';
 import { api } from '../../services/api';
+import { isSupabaseConfigured } from '../../services/supabase';
 import {
   Trash2,
   CheckCircle2,
@@ -13,6 +14,7 @@ import {
   Mic,
   Save,
   Shield,
+  Database,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -307,7 +309,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
 
-        {/* 3. Audio Retention & Data Management */}
+        {/* 3. Cloud Database & Storage (Supabase) */}
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Database className="w-4 h-4 text-[#252525]" />
+              <h2 className="text-sm font-semibold text-[#252525] uppercase tracking-wider font-mono">
+                Cloud Database & Audio Storage (Supabase)
+              </h2>
+            </div>
+            <span
+              className={`font-mono text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider ${
+                isSupabaseConfigured
+                  ? 'bg-[#F5F5F4] border-[#252525] text-[#252525]'
+                  : 'bg-[#F5F5F4] border-[#E5E5E5] text-[#929292]'
+              }`}
+            >
+              {isSupabaseConfigured ? 'Active (Supabase PostgreSQL)' : 'Standby (LocalStorage)'}
+            </span>
+          </div>
+
+          <p className="text-xs text-[#666666] leading-relaxed">
+            SpeakUp supports <strong>Supabase</strong> for persistent cloud session archives, multi-device synchronization, and audio storage. When unconfigured, sessions remain stored locally in your browser with zero data loss.
+          </p>
+
+          <div className="bg-[#F5F5F4] p-4 rounded-lg border border-[#E5E5E5] space-y-2 text-xs">
+            <span className="font-mono text-[11px] text-[#252525] block font-semibold">
+              Deployment Configuration:
+            </span>
+            <p className="text-[#666666] leading-relaxed">
+              To activate Supabase in production or locally, set these environment variables in your Vercel Dashboard or <code className="bg-white px-1 py-0.5 border rounded border-[#E5E5E5]">.env</code>:
+            </p>
+            <div className="font-mono text-[11px] bg-white p-3 rounded border border-[#E5E5E5] text-[#252525] space-y-1 select-all">
+              <div>VITE_SUPABASE_URL=https://your-project-id.supabase.co</div>
+              <div>VITE_SUPABASE_ANON_KEY=eyJhbGciOi...</div>
+            </div>
+            <p className="text-[11px] text-[#929292] pt-1">
+              Run the ready-to-use SQL script in <code className="bg-white px-1 py-0.5 border rounded border-[#E5E5E5]">supabase/schema.sql</code> in your Supabase SQL Editor to initialize the tables and audio storage bucket with 1 click.
+            </p>
+          </div>
+        </div>
+
+        {/* 4. Audio Retention & Data Management */}
         <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-5">
           <div className="flex items-center space-x-2">
             <Shield className="w-4 h-4 text-[#252525]" />
