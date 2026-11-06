@@ -222,6 +222,22 @@ Return strict JSON matching this exact structure:
       const parsed = JSON.parse(text);
 
       const dims = parsed.dimensionScores;
+      // Hybrid grammar assurance: verify if rule-based checks found additional grammatical errors
+      const localAnalysis = LocalEvaluator.evaluate(params);
+      if (localAnalysis.corrections && localAnalysis.corrections.length > 0) {
+        const existingSpoken = new Set((parsed.corrections || []).map((c: any) => c.whatSaid));
+        for (const c of localAnalysis.corrections) {
+          if (!existingSpoken.has(c.whatSaid)) {
+            parsed.corrections = parsed.corrections || [];
+            parsed.corrections.push(c);
+          }
+        }
+        // If corrections were injected, calibrate grammar score
+        if (parsed.corrections.length > 0 && dims.grammar) {
+          dims.grammar.score = Math.min(dims.grammar.score || 15, Math.max(4, 15 - parsed.corrections.length * 3));
+        }
+      }
+
       const computedTotal =
         (dims.contentRelevance?.score || 0) +
         (dims.reasoningEvidence?.score || 0) +
@@ -234,7 +250,7 @@ Return strict JSON matching this exact structure:
       parsed.id = parsed.id || `report-${Date.now()}`;
       parsed.sessionId = params.sessionId || `session-${Date.now()}`;
       parsed.isDemoMode = false;
-      parsed.evaluationVersion = '1.0.0';
+      parsed.evaluationVersion = '2.0.0-hybrid';
       parsed.createdAt = new Date().toISOString();
       parsed.transcriptScore = computedTotal;
       return parsed as EvaluationReport;

@@ -43,21 +43,41 @@ export const DEFAULT_PROGRESS: UserProgress = {
 
 class StorageService {
   public getSettings(): ProviderSettings {
+    const env = (import.meta as any).env || {};
+    const envGeminiKey = env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || '';
+    const envDeepgramKey = env.VITE_DEEPGRAM_API_KEY || env.DEEPGRAM_API_KEY || '';
+
     try {
       const stored = localStorage.getItem(SETTINGS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return { ...DEFAULT_SETTINGS, ...parsed };
+        const resolvedGemini = parsed.geminiApiKey || envGeminiKey;
+        const resolvedDeepgram = parsed.deepgramApiKey || envDeepgramKey;
+        return {
+          ...DEFAULT_SETTINGS,
+          geminiApiKey: resolvedGemini,
+          deepgramApiKey: resolvedDeepgram,
+          ...parsed,
+          isDemoMode: parsed.isDemoMode !== undefined ? parsed.isDemoMode : !resolvedGemini,
+        };
       }
     } catch (e) {
       console.warn('Failed to load settings:', e);
     }
-    return DEFAULT_SETTINGS;
+    return {
+      ...DEFAULT_SETTINGS,
+      geminiApiKey: envGeminiKey,
+      deepgramApiKey: envDeepgramKey,
+      isDemoMode: !envGeminiKey,
+    };
   }
 
   public saveSettings(settings: Partial<ProviderSettings>): ProviderSettings {
     const current = this.getSettings();
     const updated = { ...current, ...settings };
+    if (updated.geminiApiKey && updated.geminiApiKey.trim() && settings.isDemoMode === undefined) {
+      updated.isDemoMode = false;
+    }
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
     } catch (e) {
