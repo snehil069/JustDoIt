@@ -5,6 +5,8 @@ import { api } from '../../services/api';
 import {
   Trash2,
   CheckCircle2,
+  AlertCircle,
+  RefreshCw,
   Eye,
   EyeOff,
   Cpu,
@@ -26,6 +28,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<{
+    success?: boolean;
+    model?: string;
+    message?: string;
+    latencyMs?: number;
+    error?: string;
+  } | null>(null);
+
+  const handleTestGemini = async () => {
+    setTestingGemini(true);
+    setGeminiTestResult(null);
+    try {
+      const res = await api.testGeminiConnection(form.geminiApiKey || undefined);
+      setGeminiTestResult(res);
+    } catch (err: any) {
+      setGeminiTestResult({
+        success: false,
+        error: err?.message || 'Connection test failed',
+      });
+    } finally {
+      setTestingGemini(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,22 +133,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Get Gemini API key →
               </a>
             </div>
-            <div className="relative">
-              <input
-                type={showGeminiKey ? 'text' : 'password'}
-                value={form.geminiApiKey}
-                onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}
-                placeholder="AIzaSy..."
-                className="w-full py-2.5 px-3 pr-10 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showGeminiKey ? 'text' : 'password'}
+                  value={form.geminiApiKey}
+                  onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}
+                  placeholder="AQ... or AIzaSy..."
+                  className="w-full py-2.5 px-3 pr-10 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  className="absolute right-3 top-2.5 text-[#929292] hover:text-[#252525]"
+                >
+                  {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setShowGeminiKey(!showGeminiKey)}
-                className="absolute right-3 top-2.5 text-[#929292] hover:text-[#252525]"
+                onClick={handleTestGemini}
+                disabled={testingGemini}
+                className="px-4 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F4] text-[#252525] text-xs font-medium flex items-center space-x-1.5 transition-colors self-start whitespace-nowrap"
               >
-                {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <RefreshCw className={`w-3.5 h-3.5 ${testingGemini ? 'animate-spin' : ''}`} />
+                <span>{testingGemini ? 'Verifying...' : 'Test Connection'}</span>
               </button>
             </div>
+
+            {/* Test Connection Result */}
+            {geminiTestResult && (
+              <div
+                className={`p-3 rounded-lg border text-xs font-mono flex items-center justify-between ${
+                  geminiTestResult.success
+                    ? 'bg-[#F5F5F4] border-[#252525] text-[#252525]'
+                    : 'bg-[#F5F5F4] border-[#E5E5E5] text-[#666666]'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  {geminiTestResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-[#252525]" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-[#666666]" />
+                  )}
+                  <span>
+                    {geminiTestResult.success
+                      ? `Verified: Active Model [${geminiTestResult.model}] (${geminiTestResult.latencyMs}ms)`
+                      : `Connection Error: ${geminiTestResult.error}`}
+                  </span>
+                </div>
+                <span className="text-[10px] text-[#929292]">Google Developer API</span>
+              </div>
+            )}
           </div>
 
           {/* Demo Mode Switch */}

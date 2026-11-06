@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import {
   EvaluationReport,
   Topic,
@@ -9,13 +9,95 @@ import {
 } from '../../../../shared/types/index.js';
 import { config } from '../../config/index.js';
 
+// Prioritized list of active Google Developer API models supporting generateContent
+const CANDIDATE_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
+];
+
 export class GeminiProvider {
-  private getClient(apiKeyOverride?: string) {
+  private getClient(apiKeyOverride?: string): GoogleGenAI {
     const key = apiKeyOverride || config.geminiApiKey;
     if (!key) {
       throw new Error('GEMINI_API_KEY is not configured.');
     }
-    return new GoogleGenerativeAI(key);
+    return new GoogleGenAI({ apiKey: key });
+  }
+
+  /**
+   * Helper that executes generateContent with automatic model fallback
+   * (e.g. if a model is temporarily experiencing 503 high demand).
+   */
+  private async executeWithFallback(
+    ai: GoogleGenAI,
+    contents: string,
+    responseJson: boolean = true,
+    temperature: number = 0.3
+  ): Promise<{ text: string; modelUsed: string }> {
+    let lastError: any = null;
+
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: responseJson
+            ? {
+                responseMimeType: 'application/json',
+                temperature,
+              }
+            : {
+                temperature,
+              },
+        });
+
+        if (response && response.text) {
+          return { text: response.text, modelUsed: model };
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${model} request failed:`, err?.message || err);
+        // Continue to next candidate model
+      }
+    }
+
+    throw lastError || new Error('All candidate Gemini models failed to respond.');
+  }
+
+  /**
+   * Safe test connection method for backend diagnostics
+   */
+  public async testConnection(apiKeyOverride?: string): Promise<{
+    success: boolean;
+    model: string;
+    message: string;
+    latencyMs: number;
+  }> {
+    const ai = this.getClient(apiKeyOverride);
+    const start = Date.now();
+
+    const { text, modelUsed } = await this.executeWithFallback(
+      ai,
+      'Respond with a JSON object: {"status": "ok", "message": "Gemini connection verified"}',
+      true,
+      0.1
+    );
+
+    const latencyMs = Date.now() - start;
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { message: text.trim() };
+    }
+
+    return {
+      success: true,
+      model: modelUsed,
+      message: parsed.message || 'Connection verified',
+      latencyMs,
+    };
   }
 
   public async evaluateSpeech(params: {
@@ -28,8 +110,7 @@ export class GeminiProvider {
     audioMetrics?: AudioDeliveryMetrics;
     apiKeyOverride?: string;
   }): Promise<EvaluationReport> {
-    const genAI = this.getClient(params.apiKeyOverride);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const ai = this.getClient(params.apiKeyOverride);
 
     const systemPrompt = `You are the chief speech evaluator and communication architect for SpeakUp.
 Your role: Act as a strict, knowledgeable, supportive communication coach.
@@ -125,15 +206,7 @@ Return strict JSON matching this exact structure:
   }
 }`;
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.3,
-      },
-    });
-
-    const text = result.response.text();
+    const { text, modelUsed } = await this.executeWithFallback(ai, systemPrompt, true, 0.3);
     const parsed = JSON.parse(text);
 
     // Sum up score to ensure mathematical consistency
@@ -183,7 +256,7 @@ Return strict JSON matching this exact structure:
         rationale: 'Build continuous speaking endurance.',
       },
       isDemoMode: false,
-      evaluationVersion: 'gemini-1.5-flash-v1',
+      evaluationVersion: `${modelUsed}-v1`,
       createdAt: new Date().toISOString(),
     };
 
@@ -199,9 +272,7 @@ Return strict JSON matching this exact structure:
     userArgument: string;
     apiKeyOverride?: string;
   }): Promise<{ aiResponse: string; roundCritique?: string }> {
-    const genAI = this.getClient(params.apiKeyOverride);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
+    const ai = this.getClient(params.apiKeyOverride);
     const aiPosition = params.userPosition === 'for' ? 'AGAINST' : 'FOR';
 
     const historyPrompt = params.history
@@ -235,12 +306,8 @@ Respond in JSON:
   "roundCritique": "Private feedback on the logical strength or flaw in the user's turn (1-2 sentences)"
 }`;
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.6 },
-    });
-
-    const parsed = JSON.parse(result.response.text());
+    const { text } = await this.executeWithFallback(ai, prompt, true, 0.6);
+    const parsed = JSON.parse(text);
     return {
       aiResponse: parsed.aiResponse,
       roundCritique: parsed.roundCritique,
@@ -253,8 +320,7 @@ Respond in JSON:
     userAnswer: string;
     apiKeyOverride?: string;
   }): Promise<{ nextQuestion: string; feedbackOnAnswer: string; starAnalysis?: any }> {
-    const genAI = this.getClient(params.apiKeyOverride);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const ai = this.getClient(params.apiKeyOverride);
 
     const prompt = `You are a professional corporate interviewer conducting a ${params.interviewType} interview.
 Listen closely to the candidate's response.
@@ -282,12 +348,8 @@ Respond in JSON:
   }
 }`;
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
-    });
-
-    const parsed = JSON.parse(result.response.text());
+    const { text } = await this.executeWithFallback(ai, prompt, true, 0.5);
+    const parsed = JSON.parse(text);
     return {
       nextQuestion: parsed.nextQuestion,
       feedbackOnAnswer: parsed.feedbackOnAnswer,

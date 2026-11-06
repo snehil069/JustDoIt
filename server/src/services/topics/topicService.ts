@@ -1,6 +1,6 @@
 import { Topic, Category, Difficulty, PromptFormat, PracticeMode } from '../../../../shared/types/index.js';
 import { CURATED_TOPICS } from './topicBank.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { config } from '../../config/index.js';
 
 class TopicService {
@@ -30,7 +30,6 @@ class TopicService {
   }): Topic {
     let pool = CURATED_TOPICS.filter((t) => !this.recentTopicIds.has(t.id));
     if (pool.length === 0) {
-      // Clear recent cache if exhausted
       this.recentTopicIds.clear();
       pool = CURATED_TOPICS;
     }
@@ -69,8 +68,7 @@ class TopicService {
     }
 
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const ai = new GoogleGenAI({ apiKey });
 
       const prompt = `You are the lead curriculum architect for SpeakUp, an AI speaking improvement platform for college students and young professionals.
 Generate ONE highly engaging, thought-provoking speaking challenge according to these criteria:
@@ -101,15 +99,20 @@ Respond strictly with valid JSON with this exact schema:
   "source": "ai-generated"
 }`;
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
+      const result = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: {
           responseMimeType: 'application/json',
           temperature: 0.7,
         },
       });
 
-      const responseText = result.response.text();
+      const responseText = result.text;
+      if (!responseText) {
+        return this.getRandomCuratedTopic(params);
+      }
+
       const parsed = JSON.parse(responseText);
 
       if (parsed.title && parsed.question) {

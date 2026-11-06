@@ -56,6 +56,21 @@ app.post('/api/settings', (req, res) => {
   });
 });
 
+// AI Diagnostics & Connection Test
+app.all('/api/ai/test', async (req, res) => {
+  try {
+    const apiKeyOverride = (req.body?.apiKeyOverride || req.query?.apiKeyOverride) as string | undefined;
+    const result = await geminiProvider.testConnection(apiKeyOverride);
+    res.json(result);
+  } catch (err: any) {
+    const safeError = err?.message || 'Gemini API test failed';
+    res.status(500).json({
+      success: false,
+      error: safeError,
+    });
+  }
+});
+
 // Topics
 app.get('/api/topics/categories', (req, res) => {
   res.json(topicService.getCategories());

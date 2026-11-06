@@ -141,4 +141,19 @@ export const api = {
     });
     return res.json();
   },
+
+  async testGeminiConnection(apiKeyOverride?: string): Promise<{
+    success: boolean;
+    model?: string;
+    message?: string;
+    latencyMs?: number;
+    error?: string;
+  }> {
+    const res = await fetch(`${API_BASE}/ai/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKeyOverride }),
+    });
+    return res.json();
+  },
 };
