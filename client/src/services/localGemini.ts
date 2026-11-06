@@ -131,23 +131,19 @@ export class LocalGeminiService {
 
     try {
       const ai = new GoogleGenAI({ apiKey: key });
-      const prompt = `You are the chief speech evaluator and communication architect for SpeakUp.
-Your role: Act as a strict, knowledgeable, supportive communication coach.
-Tell users what they actually need to improve, not what they want to hear.
+      const prompt = `You are the lead communication evaluator and speech architect for SpeakUp.
+Your role: Act as a strict, expert, evidence-based speech coach.
+You must tell users what they actually need to improve, not what they want to hear.
 
 CRITICAL EVALUATION RULES:
 1. Honest, Calibrated Scoring: A weak response must be given 30-55. An average response 60-74. A good response 75-85. Do NOT give 90-100 to weak or mediocre responses. Never inflate scores for politeness.
 2. If the user spoke less than 20 words or gave an empty/irrelevant response, content score must be < 5 and overall score < 30.
-3. Content Relevance & Accuracy (Max 20): Did they directly answer the prompt? Distinguish facts from opinions. Flag unverified or incorrect claims.
-4. Reasoning, Examples & Evidence (Max 15): Did they explain *why*? Are examples concrete or generic? Challenge broad generalizations.
-5. Organisation & Flow (Max 15): Clear opening, body, transitions, conclusion? Point out disorganized jumping.
-6. Clarity & Sentence Construction (Max 15): Run-on sentences, awkward phrasing, clear expression.
-7. Grammar (Max 15): Real errors only (subject-verb agreement, tenses, prepositions, articles). Do NOT invent mistakes.
-8. Vocabulary & Word Choice (Max 10): Precision over big fancy words. Flag repetitive vocabulary.
-9. Fluency & Fillers (Max 10): Penalize frequent "um", "uh", "you know", "like".
-10. Corrections Table: For every genuine mistake, provide the exact spoken sentence, corrected version, and clear explanation.
-11. Better Way to Say It: Take 1-2 actual sentences spoken and show a polished, natural professional version without rewriting their entire personality.
-12. Exercises: Generate 2-3 actionable drills targeting their exact recorded weaknesses.
+3. EXHAUSTIVE GRAMMAR & SYNTAX EXAMINATION: Examine the original transcript sentence-by-sentence.
+   Identify EVERY detectable grammatical mistake, subject-verb agreement error, tense mismatch, double past ("didn't went"), incorrect preposition ("discuss about"), incorrect article ("a honest"), and plurality error ("every students").
+   DO NOT limit to 3 or 5. If 8 errors exist, list all 8.
+4. IMPORTANT POINTS MISSED: Identify 2-4 critical dimensions, trade-offs, or arguments relevant to the prompt that the speaker completely missed or insufficiently explained.
+5. REASONING & EVIDENCE: Challenge unsupported claims, sweeping generalizations, and lack of causal backing ("why"). Give exact transcript quotes.
+6. COACH'S SUMMARY: Provide direct, personalized answers to the 6 core coach questions.
 
 TASK DETAILS:
 - Topic Title: "${params.topic.title}"
@@ -178,21 +174,37 @@ Return strict JSON matching this exact structure:
     "vocabularyChoice": { "score": number (0-10), "max": 10, "feedback": "string", "evidence": "string quote" },
     "fluencyFillers": { "score": number (0-10), "max": 10, "feedback": "string", "evidence": "string quote" }
   },
-  "strengths": ["Up to 3 specific strengths with quotes from the speech"],
-  "improvementAreas": ["Top 3 critical weaknesses to fix"],
+  "detailedStrengths": [
+    { "title": "Strength heading", "evidence": "Exact quote from transcript", "impactOrWhy": "Why this was effective" }
+  ],
+  "detailedWeaknesses": [
+    { "title": "Weakness heading", "evidence": "Exact quote from transcript", "impactOrWhy": "Why this weakened the response", "actionableStep": "What to do differently" }
+  ],
   "corrections": [
     {
       "whatSaid": "exact sentence spoken with error",
       "correctVersion": "corrected grammatical sentence",
+      "errorType": "Subject-Verb Agreement / Tense / Preposition / Article / etc.",
       "explanation": "rule violated",
+      "severity": "minor" | "moderate" | "major",
       "naturalAlternative": "optional idiomatic phrasing"
     }
   ],
+  "missedPoints": [
+    {
+      "point": "Crucial aspect not discussed",
+      "whyImportant": "Why this matters to the question",
+      "howToIncorporate": "How they could have framed it",
+      "importance": "essential" | "recommended" | "optional"
+    }
+  ],
   "reasoningFeedback": {
-    "strongestArgument": "best point made",
-    "weakestArgument": "weakest point made",
+    "strongestArgument": "best point made with quote",
+    "weakestArgument": "weakest point made with quote",
     "missingPoint": "key aspect ignored",
-    "unsupportedClaims": [],
+    "unsupportedClaims": [
+      { "claim": "exact sentence quote", "flag": "unsupported", "explanation": "why this claim is problematic" }
+    ],
     "betterExample": "a more concrete example they could have used"
   },
   "betterWaysToSayIt": [
@@ -202,6 +214,14 @@ Return strict JSON matching this exact structure:
       "whyBetter": "explanation of improvement"
     }
   ],
+  "coachSummary": {
+    "whatDidWell": "Concise observation of best performance element",
+    "whatDidBadly": "Concise observation of primary failure point",
+    "whatMissed": "Most important topic dimension omitted",
+    "biggestWeaknessSkill": "Core skill needing immediate practice",
+    "whatToPractiseNext": "Recommended challenge type",
+    "nextSessionFocus": "Specific actionable focus for next recording"
+  },
   "personalizedExercises": [
     {
       "title": "Exercise name",
@@ -221,21 +241,57 @@ Return strict JSON matching this exact structure:
       const { text } = await this.executeWithFallback(ai, prompt, true, 0.3);
       const parsed = JSON.parse(text);
 
-      const dims = parsed.dimensionScores;
-      // Hybrid grammar assurance: verify if rule-based checks found additional grammatical errors
+      const dims = parsed.dimensionScores || {};
       const localAnalysis = LocalEvaluator.evaluate(params);
+
+      // 1. Hybrid grammar assurance: merge any rule-based errors that Gemini missed
       if (localAnalysis.corrections && localAnalysis.corrections.length > 0) {
-        const existingSpoken = new Set((parsed.corrections || []).map((c: any) => c.whatSaid));
+        parsed.corrections = parsed.corrections || [];
+        const existingSpoken = new Set(parsed.corrections.map((c: any) => c.whatSaid?.toLowerCase().trim()));
         for (const c of localAnalysis.corrections) {
-          if (!existingSpoken.has(c.whatSaid)) {
-            parsed.corrections = parsed.corrections || [];
+          if (!existingSpoken.has(c.whatSaid?.toLowerCase().trim())) {
             parsed.corrections.push(c);
           }
         }
-        // If corrections were injected, calibrate grammar score
-        if (parsed.corrections.length > 0 && dims.grammar) {
-          dims.grammar.score = Math.min(dims.grammar.score || 15, Math.max(4, 15 - parsed.corrections.length * 3));
+      }
+
+      // 2. Strict scoring calibration based on grammar and word count
+      if (parsed.corrections && parsed.corrections.length > 0 && dims.grammar) {
+        dims.grammar.score = Math.min(dims.grammar.score || 15, Math.max(3, 15 - parsed.corrections.length * 3));
+      }
+
+      // Set weightedPoints explicitly
+      for (const key of Object.keys(dims)) {
+        if (dims[key]) {
+          dims[key].weightedPoints = dims[key].score;
         }
+      }
+
+      // 3. Guarantee missed points presence
+      if (!parsed.missedPoints || parsed.missedPoints.length < 2) {
+        parsed.missedPoints = [
+          ...(parsed.missedPoints || []),
+          ...(localAnalysis.missedPoints || []).slice(0, 3),
+        ];
+      }
+
+      // 4. Guarantee structured detailed strengths and weaknesses
+      if (!parsed.detailedStrengths || parsed.detailedStrengths.length === 0) {
+        parsed.detailedStrengths = localAnalysis.detailedStrengths || [];
+      }
+      if (!parsed.detailedWeaknesses || parsed.detailedWeaknesses.length === 0) {
+        parsed.detailedWeaknesses = localAnalysis.detailedWeaknesses || [];
+      }
+
+      parsed.strengths = (parsed.detailedStrengths || []).map((s: any) => `${s.title}: ${s.evidence}`);
+      parsed.improvementAreas = (parsed.detailedWeaknesses || []).map((w: any) => `${w.title}: ${w.evidence}`);
+
+      // 5. Guarantee improvement plan and coach summary
+      if (!parsed.improvementPlan || parsed.improvementPlan.length === 0) {
+        parsed.improvementPlan = localAnalysis.improvementPlan || [];
+      }
+      if (!parsed.coachSummary) {
+        parsed.coachSummary = localAnalysis.coachSummary;
       }
 
       const computedTotal =
@@ -250,7 +306,7 @@ Return strict JSON matching this exact structure:
       parsed.id = parsed.id || `report-${Date.now()}`;
       parsed.sessionId = params.sessionId || `session-${Date.now()}`;
       parsed.isDemoMode = false;
-      parsed.evaluationVersion = '2.0.0-hybrid';
+      parsed.evaluationVersion = '3.0.0-hybrid';
       parsed.createdAt = new Date().toISOString();
       parsed.transcriptScore = computedTotal;
       return parsed as EvaluationReport;

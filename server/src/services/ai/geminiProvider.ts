@@ -7,6 +7,7 @@ import {
   DebateTurn,
   InterviewTurn,
 } from '../../../../shared/types/index.js';
+import { MultiStageAnalyzer } from '../../../../shared/evaluation/multiStageAnalyzer.js';
 import { config } from '../../config/index.js';
 
 // Prioritized list of active Google Developer API models supporting generateContent
@@ -209,8 +210,59 @@ Return strict JSON matching this exact structure:
     const { text, modelUsed } = await this.executeWithFallback(ai, systemPrompt, true, 0.3);
     const parsed = JSON.parse(text);
 
+    const dims = parsed.dimensionScores || {};
+    const localAnalysis = MultiStageAnalyzer.evaluateComplete(params);
+
+    // 1. Hybrid grammar assurance: merge any rule-based errors that Gemini missed
+    if (localAnalysis.corrections && localAnalysis.corrections.length > 0) {
+      parsed.corrections = parsed.corrections || [];
+      const existingSpoken = new Set(parsed.corrections.map((c: any) => c.whatSaid?.toLowerCase().trim()));
+      for (const c of localAnalysis.corrections) {
+        if (!existingSpoken.has(c.whatSaid?.toLowerCase().trim())) {
+          parsed.corrections.push(c);
+        }
+      }
+    }
+
+    // 2. Strict scoring calibration based on grammar
+    if (parsed.corrections && parsed.corrections.length > 0 && dims.grammar) {
+      dims.grammar.score = Math.min(dims.grammar.score || 15, Math.max(3, 15 - parsed.corrections.length * 3));
+    }
+
+    // Set weightedPoints
+    for (const key of Object.keys(dims)) {
+      if (dims[key]) {
+        dims[key].weightedPoints = dims[key].score;
+      }
+    }
+
+    // 3. Guarantee missed points presence
+    if (!parsed.missedPoints || parsed.missedPoints.length < 2) {
+      parsed.missedPoints = [
+        ...(parsed.missedPoints || []),
+        ...(localAnalysis.missedPoints || []).slice(0, 3),
+      ];
+    }
+
+    // 4. Guarantee structured detailed strengths and weaknesses
+    if (!parsed.detailedStrengths || parsed.detailedStrengths.length === 0) {
+      parsed.detailedStrengths = localAnalysis.detailedStrengths || [];
+    }
+    if (!parsed.detailedWeaknesses || parsed.detailedWeaknesses.length === 0) {
+      parsed.detailedWeaknesses = localAnalysis.detailedWeaknesses || [];
+    }
+
+    parsed.strengths = (parsed.detailedStrengths || []).map((s: any) => `${s.title}: ${s.evidence}`);
+    parsed.improvementAreas = (parsed.detailedWeaknesses || []).map((w: any) => `${w.title}: ${w.evidence}`);
+
+    if (!parsed.improvementPlan || parsed.improvementPlan.length === 0) {
+      parsed.improvementPlan = localAnalysis.improvementPlan || [];
+    }
+    if (!parsed.coachSummary) {
+      parsed.coachSummary = localAnalysis.coachSummary;
+    }
+
     // Sum up score to ensure mathematical consistency
-    const dims = parsed.dimensionScores;
     const computedTotal =
       (dims.contentRelevance?.score || 0) +
       (dims.reasoningEvidence?.score || 0) +
@@ -229,6 +281,11 @@ Return strict JSON matching this exact structure:
       dimensionScores: parsed.dimensionScores,
       strengths: parsed.strengths || [],
       improvementAreas: parsed.improvementAreas || [],
+      detailedStrengths: parsed.detailedStrengths,
+      detailedWeaknesses: parsed.detailedWeaknesses,
+      missedPoints: parsed.missedPoints,
+      improvementPlan: parsed.improvementPlan,
+      coachSummary: parsed.coachSummary,
       corrections: parsed.corrections || [],
       reasoningFeedback: parsed.reasoningFeedback || {},
       betterWaysToSayIt: parsed.betterWaysToSayIt || [],

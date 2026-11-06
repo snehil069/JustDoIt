@@ -1,4 +1,4 @@
-import { Topic, Category, Difficulty, PromptFormat } from '../types/index.js';
+import type { Topic, Category, Difficulty, PromptFormat } from '../types/index.ts';
 
 export const CURATED_TOPICS: Topic[] = [
   // --- EVERYDAY LIFE ---

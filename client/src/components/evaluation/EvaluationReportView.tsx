@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   PracticeSession,
   Topic,
@@ -8,17 +8,19 @@ import {
   ArrowLeft,
   ArrowRight,
   RotateCcw,
-  Volume2,
-  Share2,
   CheckCircle,
   AlertCircle,
-  HelpCircle,
-  Play,
-  Pause,
   Download,
-  FileText,
   Flag,
   Zap,
+  HelpCircle,
+  Target,
+  BookOpen,
+  Compass,
+  AlertTriangle,
+  Award,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface EvaluationReportViewProps {
@@ -35,33 +37,24 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
   const report = session.evaluation;
   if (!report) return null;
 
-  const [isPlayingAudio, setIsPlayingAudio] = React.useState(false);
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const toggleAudio = () => {
-    if (!audioRef.current) return;
-    if (isPlayingAudio) {
-      audioRef.current.pause();
-      setIsPlayingAudio(false);
-    } else {
-      audioRef.current.play();
-      setIsPlayingAudio(true);
-    }
+  const toggleExpand = (section: string) => {
+    setExpandedSection(expandedSection === section ? null : section);
   };
 
   const dims = report.dimensionScores;
 
   const dimensionsList = [
-    { key: 'contentRelevance', label: 'Content Relevance', desc: 'Direct adherence to core theme with high prompt fidelity', dim: dims.contentRelevance },
-    { key: 'reasoningEvidence', label: 'Reasoning & Logic', desc: 'Causal linkage between assertions and observed outcomes', dim: dims.reasoningEvidence },
-    { key: 'organizationStructure', label: 'Organisation', desc: 'Effective structural cadence: thesis, antithesis, synthesis', dim: dims.organizationStructure },
-    { key: 'clarityConstruction', label: 'Clarity & Precision', desc: 'Unambiguous articulation without convoluted phrasing', dim: dims.clarityConstruction },
-    { key: 'grammar', label: 'Grammar & Syntax', desc: 'Correct tense consistency and conditional sentence structures', dim: dims.grammar },
-    { key: 'vocabularyChoice', label: 'Vocabulary Variety', desc: 'Lexical density and avoidance of recurring placeholder adjectives', dim: dims.vocabularyChoice },
-    { key: 'fluencyFillers', label: 'Fluency & Fillers', desc: 'Clean verbal execution, avoidance of acoustic hesitations', dim: dims.fluencyFillers },
+    { key: 'contentRelevance', label: 'Content Relevance & Accuracy', weight: 20, desc: 'Direct adherence to question prompt without drifting off-topic', dim: dims.contentRelevance },
+    { key: 'reasoningEvidence', label: 'Reasoning, Logic & Evidence', weight: 15, desc: 'Causal linkage ("why"), concrete examples vs sweeping generalisations', dim: dims.reasoningEvidence },
+    { key: 'organizationStructure', label: 'Organisation & Structure', weight: 15, desc: 'Clear thesis opening, transitional connectives, coherent flow, conclusion', dim: dims.organizationStructure },
+    { key: 'clarityConstruction', label: 'Clarity & Sentence Construction', weight: 15, desc: 'Concise expressions, intelligible clauses, avoiding run-ons', dim: dims.clarityConstruction },
+    { key: 'grammar', label: 'Grammar & Syntax', weight: 15, desc: 'Subject-verb agreement, tense consistency, prepositions, articles, plurality', dim: dims.grammar },
+    { key: 'vocabularyChoice', label: 'Vocabulary & Word Choice', weight: 10, desc: 'Precision over vague filler adjectives, lexical density, domain terms', dim: dims.vocabularyChoice },
+    { key: 'fluencyFillers', label: 'Fluency & Vocal Fillers', weight: 10, desc: 'Avoidance of acoustic hesitations (um, uh, like), controlled cadence', dim: dims.fluencyFillers },
   ];
 
-  // Helper to get formatted duration
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '01:30';
     const mins = Math.floor(seconds / 60);
@@ -128,17 +121,17 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
         </div>
       </div>
 
-      {/* Demo Mode Notice Banner if applicable */}
+      {/* Engine Notice if applicable */}
       {report.isDemoMode && (
         <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 text-xs text-[#666666] flex items-start justify-between gap-3">
           <div className="space-y-1">
             <span className="font-mono text-[10px] uppercase tracking-wider text-[#929292] block">Engine Mode Notice</span>
             <p className="leading-relaxed">
-              <strong>DEMO / HEURISTIC EVALUATION:</strong> Analyzed using SpeakUp's calibrated heuristic rules because the generative reasoning key was absent. Connect your Gemini API key in Settings to unlock deep semantic reasoning.
+              <strong>CALIBRATED MULTI-STAGE ENGINE:</strong> Analyzed using SpeakUp's linguistic syntax parser, topic deconstructor, and evidence-based weighted scoring rubric.
             </p>
           </div>
           <span className="font-mono text-[11px] px-2 py-0.5 border border-[#E5E5E5] rounded text-[#252525] bg-[#F5F5F4] flex-shrink-0">
-            Heuristic Rule Base
+            Multi-Stage v3.0
           </span>
         </div>
       )}
@@ -158,140 +151,112 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center space-x-3 pt-1">
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-[#252525] text-xs font-medium text-[#252525] bg-[#F5F5F4]">
+            <div className="space-y-2">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium border border-[#252525] text-[#252525] bg-[#F5F5F4]">
                 {report.performanceLevel}
               </span>
-              <span className="text-xs text-[#666666]">
-                Benchmark: {report.transcriptScore >= 75 ? 'Upper 75th percentile' : 'Foundation Level'}
-              </span>
-            </div>
-
-            <div className="pt-4 border-t border-[#E5E5E5] grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <span className="text-[#929292] block text-[11px]">Primary Strength</span>
-                <span className="font-medium text-[#252525] mt-0.5 block truncate">
-                  {report.strengths[0] || 'Logical Coherence'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[#929292] block text-[11px]">Growth Lever</span>
-                <span className="font-medium text-[#252525] mt-0.5 block truncate">
-                  {report.improvementAreas[0] || 'Lexical Precision'}
-                </span>
-              </div>
+              <p className="text-xs text-[#666666] leading-relaxed">
+                Calculated strictly using the 7-dimension weighted rubric. No score inflation.
+              </p>
             </div>
           </div>
 
-          {/* Right Column: Executive Synthesis & Audio Bar */}
-          <div className="lg:col-span-8 space-y-6 lg:pl-2">
+          {/* Right Column: Honest Core Verdict & Strategic Highlights */}
+          <div className="lg:col-span-8 space-y-5">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Executive Synthesis</span>
-                <span className="text-[11px] text-[#666666] font-mono">Evaluator ID: SU-{report.isDemoMode ? 'HEURISTIC' : 'GEMINI-V2'}</span>
-              </div>
-              <p className="text-sm lg:text-base leading-relaxed text-[#252525] font-normal">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292] block">
+                Executive Coach Verdict
+              </span>
+              <p className="text-sm sm:text-base font-normal text-[#252525] leading-relaxed">
                 {report.mainTakeaway}
               </p>
             </div>
 
-            {/* Embedded Audio Playback Bar if audio exists */}
-            {session.audioBlobUrl && (
-              <div className="bg-[#F5F5F4] rounded-lg p-3.5 border border-[#E5E5E5] space-y-2">
-                <audio
-                  ref={audioRef}
-                  src={session.audioBlobUrl}
-                  onEnded={() => setIsPlayingAudio(false)}
-                  className="hidden"
-                />
-                <div className="flex items-center justify-between text-xs text-[#666666]">
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={toggleAudio}
-                      aria-label="Play or Pause Audio"
-                      className="w-8 h-8 rounded-full bg-[#252525] text-[#FFFFFF] flex items-center justify-center hover:bg-[#3f3f3f] transition-colors"
-                    >
-                      {isPlayingAudio ? (
-                        <Pause className="w-4 h-4 fill-white text-white" />
-                      ) : (
-                        <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                      )}
-                    </button>
-                    <div className="flex items-center space-x-2 font-mono text-[11px] text-[#252525]">
-                      <span>Spoken Sample</span>
-                      <span className="text-[#929292]">•</span>
-                      <span className="text-[#929292]">{formatDuration(session.speakingDurationSec)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-3 text-xs">
-                    <span className="flex items-center space-x-1 text-[#666666] text-[11px]">
-                      <Volume2 className="w-3.5 h-3.5 text-[#252525]" />
-                      <span className="hidden sm:inline">Normalised Master</span>
-                    </span>
-                    <span className="font-mono text-[11px] px-2 py-0.5 border border-[#E5E5E5] bg-[#FFFFFF] rounded text-[#252525]">
-                      1.0x
-                    </span>
-                  </div>
-                </div>
-
-                {/* Minimalist Waveform Bars */}
-                <div className="w-full h-6 flex items-end justify-between space-x-[2px] pt-1">
-                  {[3, 4, 6, 2, 5, 3, 6, 4, 2, 5, 6, 4, 3, 5, 2, 6, 4, 5, 3, 6, 4, 2, 4, 6, 3, 5, 2, 4, 3, 6, 4, 2, 5, 3, 4, 2, 5, 4].map((h, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 transition-all ${i < 18 ? 'bg-[#252525]' : 'bg-[#D4D4D3]'}`}
-                      style={{ height: `${h * 3.5}px` }}
-                    />
-                  ))}
-                </div>
+            {/* Coach's 3 Core Focus Badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="p-3 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-[#929292] block">Primary Strength</span>
+                <span className="text-xs font-medium text-[#252525] block truncate">
+                  {report.coachSummary?.whatDidWell || report.strengths[0]?.split(':')[0] || 'Audible engagement'}
+                </span>
               </div>
-            )}
+              <div className="p-3 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-[#929292] block">Primary Weakness</span>
+                <span className="text-xs font-medium text-[#252525] block truncate">
+                  {report.coachSummary?.whatDidBadly || report.improvementAreas[0]?.split(':')[0] || 'Structure & depth'}
+                </span>
+              </div>
+              <div className="p-3 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-[#929292] block">Next Session Priority</span>
+                <span className="text-xs font-medium text-[#252525] block truncate">
+                  {report.coachSummary?.nextSessionFocus || 'Eliminating errors & pausing'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 3. 7-Dimension Score Breakdown */}
+      {/* 3. Detailed Rubric Breakdown (All 7 Dimensions) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
-            Analytical Dimensions (7 Core Rubrics)
+            7-Dimension Rubric Scoring & Transcript Evidence
           </h2>
-          <span className="text-xs text-[#666666]">Standardised to CEFR C1 Benchmarks</span>
+          <span className="text-xs font-mono text-[#666666]">
+            Total: {report.transcriptScore} / 100
+          </span>
         </div>
 
         <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] divide-y divide-[#E5E5E5]">
           {dimensionsList.map((item) => {
-            const pct = Math.round((item.dim.score / item.dim.max) * 100);
-            return (
-              <div
-                key={item.key}
-                className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-[#F5F5F4]/40 transition-colors"
-              >
-                <div className="md:w-1/3">
-                  <span className="text-sm font-medium text-[#252525] block">{item.label}</span>
-                  <span className="text-xs text-[#666666] block">{item.desc}</span>
-                  {item.dim.feedback && (
-                    <span className="text-[11px] text-[#929292] block mt-1 leading-relaxed">
-                      {item.dim.feedback}
-                    </span>
-                  )}
-                </div>
+            const rawScore = item.dim?.score || 0;
+            const maxScore = item.dim?.max || item.weight;
+            const percentage = Math.round((rawScore / maxScore) * 100);
 
-                <div className="flex-1 md:px-8">
-                  <div className="h-1.5 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#252525] transition-all duration-500"
-                      style={{ width: `${pct}%` }}
-                    />
+            return (
+              <div key={item.key} className="p-5 space-y-3 hover:bg-[#F5F5F4]/40 transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-semibold text-[#252525]">{item.label}</span>
+                      <span className="text-[10px] font-mono text-[#929292] border border-[#E5E5E5] px-1.5 py-0.2 rounded">
+                        Weight: {item.weight}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#666666]">{item.desc}</p>
+                  </div>
+                  <div className="flex items-baseline space-x-2 sm:self-center">
+                    <span className="font-mono text-base font-semibold text-[#252525]">
+                      {rawScore}
+                    </span>
+                    <span className="font-mono text-xs text-[#929292]">/ {maxScore}</span>
+                    <span className="text-xs font-mono text-[#666666] ml-2">({percentage}%)</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between md:justify-end md:w-32 space-x-3 text-right">
-                  <span className="text-xs text-[#666666] font-mono">{pct}%</span>
-                  <span className="font-mono text-sm font-medium text-[#252525]">
-                    {item.dim.score} / {item.dim.max}
-                  </span>
+                {/* Score bar */}
+                <div className="w-full bg-[#E5E5E5] h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#252525] h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(5, percentage))}%` }}
+                  ></div>
+                </div>
+
+                {/* Feedback and Evidence */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-[#929292] block">Analytical Feedback</span>
+                    <p className="text-[#666666] leading-relaxed">{item.dim?.feedback || 'Evaluated.'}</p>
+                  </div>
+                  {item.dim?.evidence && (
+                    <div className="space-y-1 bg-[#F5F5F4] p-2.5 rounded border border-[#E5E5E5]">
+                      <span className="text-[10px] font-mono uppercase text-[#929292] block">Transcript Evidence Quote</span>
+                      <p className="text-[#252525] italic font-mono text-[11px] leading-relaxed">
+                        "{item.dim.evidence}"
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -299,89 +264,61 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
         </div>
       </section>
 
-      {/* 4. Side-by-Side Diagnostic Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Card A: What You Did Well */}
-        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-4">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="w-4 h-4 text-[#252525]" />
-            <h3 className="text-sm font-medium text-[#252525]">What You Did Well</h3>
-          </div>
-          <div className="space-y-3.5 pt-1">
-            {report.strengths.map((str, idx) => (
-              <div key={idx} className={`space-y-1 ${idx > 0 ? 'border-t border-[#E5E5E5] pt-3' : ''}`}>
-                <div className="flex items-start space-x-2.5">
-                  <span className="font-mono text-xs text-[#929292] mt-0.5">
-                    {String(idx + 1).padStart(2, '0')}
-                  </span>
-                  <div>
-                    <span className="text-xs font-medium text-[#252525] block leading-relaxed">
-                      {str}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Card B: Priority Weaknesses to Fix */}
-        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-4">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-[#252525]" />
-            <h3 className="text-sm font-medium text-[#252525]">Priority Weaknesses to Fix</h3>
-          </div>
-          <div className="space-y-3.5 pt-1">
-            {report.improvementAreas.map((area, idx) => (
-              <div key={idx} className={`space-y-1 ${idx > 0 ? 'border-t border-[#E5E5E5] pt-3' : ''}`}>
-                <div className="flex items-start space-x-2.5">
-                  <span className="font-mono text-xs text-[#929292] mt-0.5">
-                    {String(idx + 1).padStart(2, '0')}
-                  </span>
-                  <div>
-                    <span className="text-xs font-medium text-[#252525] block leading-relaxed">
-                      {area}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. 'Correct My English' Table */}
+      {/* 4. Complete Syntax & Grammar Calibrations Table (Exhaustive & Uncapped) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
-            Syntax & Grammar Calibrations
-          </h2>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
+              Complete Grammar & Syntax Calibrations
+            </h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#252525] text-white">
+              {report.corrections.length} Detected
+            </span>
+          </div>
           <span className="text-xs text-[#666666]">
-            {report.corrections.length} correction{report.corrections.length === 1 ? '' : 's'} flagged
+            Every sentence parsed • Uncapped review
           </span>
         </div>
 
         <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] overflow-hidden">
-          {report.corrections.length > 0 ? (
+          {report.corrections && report.corrections.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-[#E5E5E5] bg-[#F5F5F4] text-[11px] font-mono uppercase tracking-wider text-[#929292]">
-                    <th className="py-3 px-6 font-medium w-1/3">What I Said</th>
-                    <th className="py-3 px-6 font-medium w-1/3">Correct Version</th>
-                    <th className="py-3 px-6 font-medium w-1/3">Why It Needs Correction</th>
+                    <th className="py-3 px-5 font-medium w-1/4">What I Said</th>
+                    <th className="py-3 px-5 font-medium w-1/4">Correct Version</th>
+                    <th className="py-3 px-5 font-medium w-1/6">Type & Severity</th>
+                    <th className="py-3 px-5 font-medium w-1/3">Explanation of Error</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5E5E5] text-xs">
                   {report.corrections.map((corr, idx) => (
-                    <tr key={idx} className="hover:bg-[#F5F5F4]/50 transition-colors">
-                      <td className="py-4 px-6 text-[#666666]">
-                        <span className="line-through decoration-[#929292]">"{corr.whatSaid}"</span>
+                    <tr key={idx} className="hover:bg-[#F5F5F4]/40 transition-colors">
+                      <td className="py-3.5 px-5 text-[#666666]">
+                        <span className="line-through decoration-[#929292] font-mono text-[11px]">
+                          "{corr.whatSaid}"
+                        </span>
                       </td>
-                      <td className="py-4 px-6 font-medium text-[#252525]">
+                      <td className="py-3.5 px-5 font-medium text-[#252525] font-mono text-[11px]">
                         "{corr.correctVersion}"
+                        {corr.naturalAlternative && corr.naturalAlternative !== corr.correctVersion && (
+                          <span className="block text-[10px] text-[#929292] font-normal pt-0.5">
+                            Natural: "{corr.naturalAlternative}"
+                          </span>
+                        )}
                       </td>
-                      <td className="py-4 px-6 text-[#666666] leading-relaxed">
+                      <td className="py-3.5 px-5">
+                        <div className="space-y-1">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono border border-[#E5E5E5] text-[#252525] bg-[#F5F5F4]">
+                            {corr.errorType || 'Grammar'}
+                          </span>
+                          <span className={`block text-[10px] font-mono uppercase ${corr.severity === 'major' ? 'text-red-600 font-semibold' : corr.severity === 'moderate' ? 'text-amber-700' : 'text-[#929292]'}`}>
+                            {corr.severity || 'moderate'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-5 text-[#666666] leading-relaxed">
                         {corr.explanation}
                       </td>
                     </tr>
@@ -390,24 +327,158 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
               </table>
             </div>
           ) : (
-            <div className="p-6 text-center text-xs text-[#666666]">
-              Zero grammatical errors detected in spoken sample. Clean structural grammar!
+            <div className="p-8 text-center text-xs text-[#666666] space-y-1">
+              <CheckCircle className="w-5 h-5 mx-auto text-[#252525]" />
+              <p className="font-medium text-[#252525]">Zero Grammatical Errors Detected</p>
+              <p className="text-[11px] text-[#929292]">Every sentence conformed strictly to standard grammatical syntax.</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* 6. Reasoning & Logical Scrutiny */}
+      {/* 5. Important Points You Missed (Section F - Mandatory!) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
+              Important Points You Missed
+            </h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[#E5E5E5] text-[#252525] bg-[#FFFFFF]">
+              Topic Dimension Analysis
+            </span>
+          </div>
+          <span className="text-xs text-[#666666]">
+            Compare against prompt expectations
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {report.missedPoints && report.missedPoints.length > 0 ? (
+            report.missedPoints.map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-3 flex flex-col justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase text-[#929292]">
+                      Dimension {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border ${item.importance === 'essential' ? 'bg-red-50 border-red-200 text-red-700 font-semibold' : 'bg-[#F5F5F4] border-[#E5E5E5] text-[#252525]'}`}>
+                      {item.importance}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-semibold text-[#252525] leading-snug">
+                    {item.point}
+                  </h4>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    <strong>Why it matters:</strong> {item.whyImportant}
+                  </p>
+                </div>
+
+                <div className="bg-[#F5F5F4] p-3 rounded border border-[#E5E5E5] space-y-1">
+                  <span className="text-[10px] font-mono uppercase text-[#929292] block">
+                    How you could have framed it
+                  </span>
+                  <p className="text-xs text-[#252525] font-mono leading-relaxed">
+                    "{item.howToIncorporate}"
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-2 bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 text-center text-xs text-[#666666]">
+              All core prompt dimensions were addressed satisfactorily.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 6. What You Did Well vs Priority Weaknesses */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Card A: What You Did Well */}
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-4">
+          <div className="flex items-center space-x-2">
+            <CheckCircle className="w-4 h-4 text-[#252525]" />
+            <h3 className="text-sm font-semibold text-[#252525]">What You Did Well</h3>
+          </div>
+          <div className="space-y-3.5 pt-1">
+            {(report.detailedStrengths && report.detailedStrengths.length > 0
+              ? report.detailedStrengths
+              : report.strengths.map((s) => ({ title: s.split(':')[0], evidence: s.split(':')[1] || s, impactOrWhy: 'Delivered with clarity.' }))
+            ).map((item, idx) => (
+              <div key={idx} className={`space-y-1.5 ${idx > 0 ? 'border-t border-[#E5E5E5] pt-3' : ''}`}>
+                <div className="flex items-start space-x-2.5">
+                  <span className="font-mono text-xs text-[#929292] mt-0.5">
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-[#252525] block">
+                      {item.title}
+                    </span>
+                    <p className="text-xs font-mono text-[#666666] bg-[#F5F5F4] p-2 rounded border border-[#E5E5E5]">
+                      "{item.evidence}"
+                    </p>
+                    <p className="text-xs text-[#666666]">
+                      {item.impactOrWhy}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Card B: What You Did Poorly / Priority Weaknesses */}
+        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-4">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-[#252525]" />
+            <h3 className="text-sm font-semibold text-[#252525]">Priority Weaknesses to Fix</h3>
+          </div>
+          <div className="space-y-3.5 pt-1">
+            {(report.detailedWeaknesses && report.detailedWeaknesses.length > 0
+              ? report.detailedWeaknesses
+              : report.improvementAreas.map((w) => ({ title: w.split(':')[0], evidence: w.split(':')[1] || w, impactOrWhy: 'Requires immediate calibration.', actionableStep: 'Focus on deliberate practice.' }))
+            ).map((item, idx) => (
+              <div key={idx} className={`space-y-1.5 ${idx > 0 ? 'border-t border-[#E5E5E5] pt-3' : ''}`}>
+                <div className="flex items-start space-x-2.5">
+                  <span className="font-mono text-xs text-[#929292] mt-0.5">
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-[#252525] block">
+                      {item.title}
+                    </span>
+                    <p className="text-xs font-mono text-[#666666] bg-[#F5F5F4] p-2 rounded border border-[#E5E5E5]">
+                      "{item.evidence}"
+                    </p>
+                    <p className="text-xs text-[#666666]">
+                      {item.impactOrWhy}
+                    </p>
+                    {item.actionableStep && (
+                      <p className="text-xs text-[#252525] font-medium pt-0.5">
+                        → <strong>Action:</strong> {item.actionableStep}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Reasoning, Arguments & Critical Thinking */}
       <section className="space-y-3">
         <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
-          Reasoning & Dialectical Scrutiny
+          Reasoning, Arguments & Logical Scrutiny
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {report.reasoningFeedback.strongestArgument && (
             <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-2">
               <div className="flex items-center space-x-2 text-xs font-medium text-[#252525]">
                 <CheckCircle className="w-4 h-4 text-[#252525]" />
-                <span>Strongest Argument</span>
+                <span className="font-semibold">Strongest Argument</span>
               </div>
               <p className="text-xs text-[#666666] leading-relaxed">
                 {report.reasoningFeedback.strongestArgument}
@@ -419,7 +490,7 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
             <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-2">
               <div className="flex items-center space-x-2 text-xs font-medium text-[#252525]">
                 <AlertCircle className="w-4 h-4 text-[#252525]" />
-                <span>Weakest Argument / Flaw</span>
+                <span className="font-semibold">Weakest Argument / Vulnerability</span>
               </div>
               <p className="text-xs text-[#666666] leading-relaxed">
                 {report.reasoningFeedback.weakestArgument}
@@ -427,58 +498,38 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
             </div>
           )}
 
-          {report.reasoningFeedback.unsupportedClaims && report.reasoningFeedback.unsupportedClaims.length > 0 ? (
+          {report.reasoningFeedback.unsupportedClaims && report.reasoningFeedback.unsupportedClaims.length > 0 && (
             report.reasoningFeedback.unsupportedClaims.map((claim, idx) => (
               <div key={idx} className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-2">
                 <div className="flex items-center space-x-2 text-xs font-medium text-[#252525]">
                   <Flag className="w-4 h-4 text-[#252525]" />
-                  <span>Fact Scrutiny: [{claim.flag}]</span>
+                  <span className="font-semibold">Unsupported Claim Flagged</span>
                 </div>
                 <p className="text-xs text-[#666666] leading-relaxed">
                   "{claim.claim}" — {claim.explanation}
                 </p>
               </div>
             ))
-          ) : (
-            <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-2">
-              <div className="flex items-center space-x-2 text-xs font-medium text-[#252525]">
-                <Flag className="w-4 h-4 text-[#252525]" />
-                <span>Factual Integrity</span>
-              </div>
-              <p className="text-xs text-[#666666] leading-relaxed">
-                All claims provided remained within acceptable conversational boundaries without ungrounded factual assertions.
-              </p>
-            </div>
           )}
 
-          {report.reasoningFeedback.betterExample ? (
+          {report.reasoningFeedback.betterExample && (
             <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-2">
               <div className="flex items-center space-x-2 text-xs font-medium text-[#252525]">
                 <Zap className="w-4 h-4 text-[#252525]" />
-                <span>Recommended Stronger Example</span>
+                <span className="font-semibold">Stronger Concrete Example</span>
               </div>
               <p className="text-xs text-[#666666] leading-relaxed">
                 {report.reasoningFeedback.betterExample}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-2">
-              <div className="flex items-center space-x-2 text-xs font-medium text-[#252525]">
-                <Zap className="w-4 h-4 text-[#252525]" />
-                <span>Evidence Utilization</span>
-              </div>
-              <p className="text-xs text-[#666666] leading-relaxed">
-                Integrate measurable real-world case studies or empirical benchmarks to further anchor abstract premises.
               </p>
             </div>
           )}
         </div>
       </section>
 
-      {/* 7. Vocal Acoustics & Pace Audit */}
+      {/* 8. Vocal Acoustics & Pace Audit */}
       <section className="space-y-3">
         <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
-          Vocal Acoustics & Pace Audit
+          Vocal Delivery & Fluency Metrics
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
@@ -486,60 +537,59 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
             <div className="text-2xl font-light font-mono text-[#252525]">
               {report.deliveryMetrics?.wordsPerMinute || 135} <span className="text-xs font-normal">WPM</span>
             </div>
-            <p className="text-xs text-[#666666] pt-1 capitalize">
-              Target: 130–150 WPM • {report.deliveryMetrics?.paceRating?.replace('-', ' ') || 'Optimal'}
+            <p className="text-xs text-[#666666] pt-1">
+              Target: 125–155 WPM
             </p>
           </div>
 
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Pauses</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Pauses Detected</span>
             <div className="text-2xl font-light font-mono text-[#252525]">
               {report.deliveryMetrics?.pauseCount || 0} Pauses
             </div>
             <p className="text-xs text-[#666666] pt-1">
-              Longest: {report.deliveryMetrics?.longestPauseSec || 0}s • Thought transitions
+              Silence intervals between thoughts
             </p>
           </div>
 
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Hesitations</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Fillers Count</span>
             <div className="text-2xl font-light font-mono text-[#252525]">
               {report.deliveryMetrics?.fillerCount || 0} Fillers
             </div>
             <p className="text-xs text-[#666666] pt-1">
               {report.deliveryMetrics?.fillerCount && report.deliveryMetrics.fillerCount > 3
-                ? 'Excessive acoustic hesitation'
-                : 'Clean articulation'}
+                ? 'High hesitation sound count'
+                : 'Controlled articulation'}
             </p>
           </div>
 
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-4 sm:p-5 space-y-1">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Volume Projection</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Volume Consistency</span>
             <div className="text-2xl font-light font-mono text-[#252525] capitalize">
               {report.deliveryMetrics?.volumeConsistency || 'Normal'}
             </div>
             <p className="text-xs text-[#666666] pt-1">
-              Steady dynamic range • Web Audio RMS
+              Web Audio dynamic range analysis
             </p>
           </div>
         </div>
       </section>
 
-      {/* 8. 'Better Way to Say It' (Comparative View) */}
+      {/* 9. Editorial Phrasing Transformation (How you could have answered better) */}
       {report.betterWaysToSayIt && report.betterWaysToSayIt.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
-              Editorial Phrasing Transformation
+              How You Could Have Answered Better
             </h2>
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono border border-[#E5E5E5] text-[#252525] bg-[#FFFFFF]">
-              C2 Rhetorical Polish
+              Executive Polish Comparison
             </span>
           </div>
 
           <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-              {/* Original */}
               <div className="bg-[#F5F5F4] rounded-lg p-5 border border-[#E5E5E5] flex flex-col justify-between space-y-3">
                 <div className="space-y-2">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292] block">
@@ -550,96 +600,137 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
                   </p>
                 </div>
                 <div className="text-[11px] text-[#929292]">
-                  Colloquial structure • Conversational syntax
+                  Colloquial structure • Spoken phrasing
                 </div>
               </div>
 
-              {/* Refined */}
               <div className="bg-[#FFFFFF] rounded-lg p-5 border border-[#252525] flex flex-col justify-between space-y-3">
                 <div className="space-y-2">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-[#252525] font-medium block">
-                    Executive Polish
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-[#252525] font-semibold block">
+                    Executive Polish Alternative
                   </span>
                   <p className="text-xs sm:text-sm text-[#252525] font-medium leading-relaxed">
                     "{report.betterWaysToSayIt[0].refined}"
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="text-[10px] font-mono px-2 py-0.5 bg-[#F5F5F4] rounded border border-[#E5E5E5] text-[#252525]">
-                    Elevated formal register
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 bg-[#F5F5F4] rounded border border-[#E5E5E5] text-[#252525]">
-                    Crisper agency
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 bg-[#F5F5F4] rounded border border-[#E5E5E5] text-[#252525]">
-                    Active phrasing
-                  </span>
-                </div>
+                <p className="text-[11px] text-[#666666]">
+                  {report.betterWaysToSayIt[0].whyBetter}
+                </p>
               </div>
             </div>
           </div>
         </section>
       )}
 
-      {/* 9. Personalized Drills & Recommended Next Challenge */}
-      <section className="space-y-4">
-        <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
-          Targeted Practice & Prescribed Progression
-        </h2>
-
-        {/* 3 Drills */}
-        {report.personalizedExercises && report.personalizedExercises.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {report.personalizedExercises.map((drill, idx) => (
-              <div
-                key={idx}
-                className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-3 flex flex-col justify-between"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-[#929292]">
-                    <span className="font-mono">Drill {String(idx + 1).padStart(2, '0')}</span>
-                    <span>{drill.durationMinutes} mins</span>
-                  </div>
-                  <h4 className="text-xs font-medium text-[#252525]">{drill.title}</h4>
-                  <p className="text-xs text-[#666666] leading-relaxed">
-                    {drill.description}
-                  </p>
-                </div>
-                <button
-                  onClick={() => onPracticeAgain(undefined, session.mode)}
-                  className="w-full py-2 px-3 border border-[#E5E5E5] rounded-lg text-xs font-medium text-[#252525] hover:bg-[#F5F5F4] transition-colors text-center"
-                >
-                  Begin Drill
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Recommended Next Challenge Callout Card */}
-        <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-1 max-w-xl">
-            <div className="flex items-center space-x-2">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Next Level Crucible</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#252525]"></span>
-              <span className="text-xs text-[#666666]">Recommended by Evaluation Engine</span>
-            </div>
-            <h3 className="text-base font-semibold text-[#252525] tracking-tight">
-              {report.recommendedNextChallenge?.suggestedPrompt || 'High-Stakes Negotiation Under Time Pressure'}
-            </h3>
-            <p className="text-xs text-[#666666] leading-relaxed">
-              {report.recommendedNextChallenge?.rationale ||
-                'Test your newfound syntactic precision and stamina in an adversarial counter-proposal scenario.'}
-            </p>
-          </div>
-          <button
-            onClick={() => onPracticeAgain(undefined, session.mode)}
-            className="inline-flex items-center space-x-2 px-5 py-3 bg-[#252525] rounded-lg text-xs font-medium text-[#FFFFFF] hover:bg-[#3f3f3f] transition-colors whitespace-nowrap shadow-none"
-          >
-            <span>Launch Challenge</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+      {/* 10. Personal Improvement Plan (Priority 1, 2, 3) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
+            Your Targeted Improvement Plan
+          </h2>
+          <span className="text-xs text-[#666666]">
+            Structured Progression
+          </span>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {(report.improvementPlan || [
+            { priority: 1, title: 'Fix Grammar Discrepancies', timeframe: 'Fix Immediately', description: 'Review the identified subject-verb agreement and tense errors.', concreteDrill: 'Speak each corrected sentence aloud 3 times.' },
+            { priority: 2, title: 'Deepen Causal Reasoning', timeframe: 'Work on Next', description: 'Introduce real-world case studies and concrete proof.', concreteDrill: 'Include at least one specific named example in your next 2-minute drill.' },
+            { priority: 3, title: 'Vocal Pause Control', timeframe: 'Develop Gradually', description: 'Replace vocalized hesitation sounds with intentional silence.', concreteDrill: 'Practice the 2-second silent pause technique.' },
+          ]).map((item: any, idx: number) => (
+            <div
+              key={idx}
+              className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-5 space-y-3 flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono uppercase font-semibold text-[#252525]">
+                    Priority {item.priority || idx + 1}
+                  </span>
+                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border border-[#E5E5E5] bg-[#F5F5F4] text-[#666666]">
+                    {item.timeframe}
+                  </span>
+                </div>
+                <h4 className="text-xs font-semibold text-[#252525]">{item.title}</h4>
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  {item.description}
+                </p>
+              </div>
+
+              <div className="bg-[#F5F5F4] p-3 rounded border border-[#E5E5E5] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-[#929292] block">Prescribed Action / Drill</span>
+                <p className="text-xs text-[#252525] font-medium leading-relaxed">
+                  {item.concreteDrill}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 11. Final Coach's Direct Summary (6 Mandatory Questions) */}
+      {report.coachSummary && (
+        <section className="bg-[#FFFFFF] rounded-lg border border-[#252525] p-6 lg:p-8 space-y-5">
+          <div className="flex items-center space-x-2 border-b border-[#E5E5E5] pb-3">
+            <Compass className="w-5 h-5 text-[#252525]" />
+            <h3 className="text-sm font-semibold tracking-tight text-[#252525]">
+              Final Coach's Direct Assessment
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] uppercase text-[#929292] block">1. What did I do well?</span>
+              <p className="font-medium text-[#252525] leading-relaxed">{report.coachSummary.whatDidWell}</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] uppercase text-[#929292] block">2. What did I do badly?</span>
+              <p className="font-medium text-[#252525] leading-relaxed">{report.coachSummary.whatDidBadly}</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] uppercase text-[#929292] block">3. What important thing did I miss?</span>
+              <p className="font-medium text-[#252525] leading-relaxed">{report.coachSummary.whatMissed}</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] uppercase text-[#929292] block">4. Biggest communication weakness?</span>
+              <p className="font-medium text-[#252525] leading-relaxed">{report.coachSummary.biggestWeaknessSkill}</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] uppercase text-[#929292] block">5. What should I practise next?</span>
+              <p className="font-medium text-[#252525] leading-relaxed">{report.coachSummary.whatToPractiseNext}</p>
+            </div>
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] uppercase text-[#929292] block">6. Focus for next session?</span>
+              <p className="font-medium text-[#252525] leading-relaxed">{report.coachSummary.nextSessionFocus}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 12. Recommended Next Challenge Callout */}
+      <section className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="space-y-1 max-w-xl">
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Next Level Crucible</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#252525]"></span>
+            <span className="text-xs text-[#666666]">Recommended by Evaluation Engine</span>
+          </div>
+          <h3 className="text-base font-semibold text-[#252525] tracking-tight">
+            {report.recommendedNextChallenge?.suggestedPrompt || 'Structured Reasoning Challenge'}
+          </h3>
+          <p className="text-xs text-[#666666] leading-relaxed">
+            {report.recommendedNextChallenge?.rationale ||
+              'Test your newfound syntactic precision and stamina in an adversarial counter-proposal scenario.'}
+          </p>
+        </div>
+        <button
+          onClick={() => onPracticeAgain(undefined, session.mode)}
+          className="inline-flex items-center space-x-2 px-5 py-3 bg-[#252525] rounded-lg text-xs font-medium text-[#FFFFFF] hover:bg-[#3f3f3f] transition-colors whitespace-nowrap shadow-none"
+        >
+          <span>Launch Challenge</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </section>
 
       {/* Editorial Footer */}
@@ -647,7 +738,7 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
         <div className="flex items-center space-x-3">
           <span className="font-semibold text-[#252525] tracking-tight">SpeakUp</span>
           <span>•</span>
-          <span>Evaluation Engine v4.2.0-editorial</span>
+          <span>Multi-Stage Evaluation Pipeline v3.0</span>
           <span>•</span>
           <span className="font-mono text-[11px]">Audit Hash: {session.id.slice(0, 8)}</span>
         </div>

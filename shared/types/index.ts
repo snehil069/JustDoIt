@@ -83,6 +83,40 @@ export interface GrammarCorrection {
   correctVersion: string;
   explanation: string;
   naturalAlternative?: string;
+  errorType?: string;
+  severity?: 'minor' | 'moderate' | 'major';
+}
+
+export interface MissedPoint {
+  point: string;
+  whyImportant: string;
+  howToIncorporate: string;
+  importance: 'essential' | 'recommended' | 'optional';
+}
+
+export interface ImprovementPriority {
+  priority: 1 | 2 | 3;
+  title: string;
+  description: string;
+  targetWeakness: string;
+  concreteDrill: string;
+  timeframe: 'Fix Immediately' | 'Work on Next' | 'Develop Gradually';
+}
+
+export interface CoachSummary {
+  whatDidWell: string;
+  whatDidBadly: string;
+  whatMissed: string;
+  biggestWeaknessSkill: string;
+  whatToPractiseNext: string;
+  nextSessionFocus: string;
+}
+
+export interface DetailedObservation {
+  title: string;
+  evidence: string;
+  impactOrWhy: string;
+  actionableStep?: string;
 }
 
 export interface FactualClaimFlag {
@@ -93,8 +127,9 @@ export interface FactualClaimFlag {
 }
 
 export interface DimensionScore {
-  score: number;
-  max: number;
+  score: number; // raw points scored
+  max: number; // max weight
+  weightedPoints: number; // points contributed to total 100
   feedback: string;
   evidence: string;
 }
@@ -143,8 +178,13 @@ export interface EvaluationReport {
     vocabularyChoice: DimensionScore; // max 10
     fluencyFillers: DimensionScore; // max 10
   };
-  strengths: string[]; // max 3, concrete
-  improvementAreas: string[]; // top 3 critical
+  strengths: string[]; // up to 5 concrete strengths
+  improvementAreas: string[]; // top critical weaknesses
+  detailedStrengths?: DetailedObservation[];
+  detailedWeaknesses?: DetailedObservation[];
+  missedPoints?: MissedPoint[];
+  improvementPlan?: ImprovementPriority[];
+  coachSummary?: CoachSummary;
   corrections: GrammarCorrection[];
   reasoningFeedback: {
     strongestArgument?: string;
