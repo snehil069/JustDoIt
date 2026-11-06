@@ -64,6 +64,19 @@ export function App() {
     setProgress(loadedProgress);
     setSessions(loadedSessions);
 
+    // Check server settings to adopt server-configured providers
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((serverSettings) => {
+        if (serverSettings.hasDeepgramKey) {
+          const updated = storageService.saveSettings({
+            preferredSttProvider: 'deepgram',
+          });
+          setSettings(updated);
+        }
+      })
+      .catch(() => {});
+
     // Fetch daily challenge
     api.getRandomTopic({ category: 'everyday-life', difficulty: 'medium' })
       .then((t) => setDailyChallenge(t))
