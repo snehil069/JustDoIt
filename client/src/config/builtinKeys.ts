@@ -22,6 +22,6 @@ export const BUILTIN_API_KEYS = {
     return decodeKey('QVEuQWI4Uk42SXROclFWVWlsZ1dkUHY5bTBDcVlBaDl1VmQ3UXdFb1ZIVlk0bXhFNlQ1aGc=');
   },
   get deepgram(): string {
-    return decodeKey('NmQyZjdlODE1MDE5YTA4ZGZiZjlkN2I5OTdhMDY1NjA0OTFmZjI2NA==');
+    return decodeKey('YzY0OTM1NzhhZmQxYTZhZTY5MGRhNmRkZmVlZTZjOGE4OGU5ZWYzYg==');
   },
 };

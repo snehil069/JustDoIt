@@ -340,9 +340,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {form.preferredSttProvider === 'deepgram' && (
             <div className="space-y-1.5 animate-fadeIn pt-1">
               <div className="flex items-center justify-between text-xs">
-                <label className="font-medium text-[#252525]">
-                  Deepgram API Key
-                </label>
+                <div className="flex items-center space-x-2">
+                  <label className="font-medium text-[#252525]">
+                    Deepgram API Key
+                  </label>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Universal Key Active
+                  </span>
+                </div>
                 <a
                   href="https://console.deepgram.com"
                   target="_blank"
