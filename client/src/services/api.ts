@@ -7,6 +7,7 @@ import {
   EvaluationReport,
   DebateTurn,
   InterviewTurn,
+  IdealSpeech,
 } from '@shared/types/index';
 import { CURATED_TOPICS } from '@shared/topics/topicBank';
 import { storageService } from './storage';
@@ -277,6 +278,31 @@ export const api = {
             }
           : undefined,
         researchNotes: payload.researchNotes,
+        apiKeyOverride: settings.geminiApiKey || undefined,
+      });
+    }
+  },
+
+  async generateIdealSpeech(params: {
+    topic: Topic;
+    mode: PracticeMode;
+    difficulty?: Difficulty;
+    originalTranscript?: string;
+    weaknessesToAddress?: string[];
+  }): Promise<IdealSpeech> {
+    const settings = storageService.getSettings();
+    try {
+      return await safeFetchJson<IdealSpeech>(`${API_BASE}/evaluate/ideal-speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...params,
+          apiKeyOverride: settings.geminiApiKey || undefined,
+        }),
+      });
+    } catch {
+      return LocalGeminiService.generateIdealSpeech({
+        ...params,
         apiKeyOverride: settings.geminiApiKey || undefined,
       });
     }

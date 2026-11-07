@@ -9,6 +9,7 @@ import {
   DebateTurn,
   InterviewTurn,
   AudioDeliveryMetrics,
+  IdealSpeech,
 } from '@shared/types/index';
 import { storageService } from './storage';
 import { LocalEvaluator } from './localEvaluator';
@@ -18,7 +19,6 @@ const CANDIDATE_MODELS = [
   'gemini-3.1-flash-lite',
   'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-3.8-flash',
 ];
 
 export class LocalGeminiService {
@@ -589,6 +589,177 @@ Return strict JSON:
       return {
         followUpQuestion: 'That gives good context. Looking back, what is one thing you would do differently in that scenario?',
         feedback: 'Good honesty. Remember to highlight your personal contribution versus the general team effort.',
+      };
+    }
+  }
+
+  public static async generateIdealSpeech(params: {
+    topic: Topic;
+    mode: PracticeMode;
+    difficulty?: Difficulty;
+    originalTranscript?: string;
+    weaknessesToAddress?: string[];
+    apiKeyOverride?: string;
+  }): Promise<IdealSpeech> {
+    const key = this.getApiKey(params.apiKeyOverride);
+
+    const weaknessContext =
+      params.weaknessesToAddress && params.weaknessesToAddress.length > 0
+        ? `TARGET WEAKNESSES TO REMEDY:
+${params.weaknessesToAddress.map((w, i) => `${i + 1}. ${w}`).join('\n')}`
+        : '';
+
+    if (!key) {
+      return {
+        topicTitle: params.topic.title,
+        targetDurationSec: 150,
+        idealTranscript: `When we examine ${params.topic.title.toLowerCase()}, the central question is not merely what is convenient today, but how we build lasting resilience for tomorrow. First and foremost, empirical evidence shows that clear systemic incentives drive sustainable outcomes far more effectively than isolated interventions. Consider, for instance, how modern organizations navigate rapid technological shifts: those that establish clear guardrails succeed, while those acting without foresight face compounding friction. Now, critics often point out that immediate adaptation requires significant initial investment. While that concern is valid, delaying action invariably compounds long-term costs. In conclusion, by aligning our incentives with deliberate structural habits, we transform an apparent trade-off into an enduring strategic advantage.`,
+        structureBreakdown: [
+          {
+            sectionName: '1. Hook & Provocative Thesis',
+            contentSnippet: `When we examine ${params.topic.title.toLowerCase()}, the central question is not merely what is convenient today, but how we build lasting resilience for tomorrow.`,
+            rhetoricalPurpose: 'Captures attention and establishes immediate intellectual point of view.',
+          },
+          {
+            sectionName: '2. Causal Evidence & Concrete Illustration',
+            contentSnippet:
+              'First and foremost, empirical evidence shows that clear systemic incentives drive sustainable outcomes far more effectively than isolated interventions.',
+            rhetoricalPurpose: 'Demonstrates why this premise holds with empirical/real-world context.',
+          },
+          {
+            sectionName: '3. Conceding the Nuance / Counter-Perspective',
+            contentSnippet:
+              'Now, critics often point out that immediate adaptation requires significant initial investment. While that concern is valid, delaying action invariably compounds long-term costs.',
+            rhetoricalPurpose: 'Anticipates counterarguments, proving intellectual honesty.',
+          },
+          {
+            sectionName: '4. Memorable Synthesis & Call-to-Thought',
+            contentSnippet:
+              'In conclusion, by aligning our incentives with deliberate structural habits, we transform an apparent trade-off into an enduring strategic advantage.',
+            rhetoricalPurpose: 'Leaves a lasting, cohesive impression without merely repeating.',
+          },
+        ],
+        keyTechniquesUsed: [
+          'Antithesis & Contrast Framing',
+          'Concrete Metric-Anchored Illustration',
+          'Direct Counter-Argument Deconstruction',
+          'Signposted Rhetorical Flow',
+        ],
+        estimatedWpm: 140,
+        whyThisScoresHigh:
+          'Features a clear thesis, structured causal reasoning, explicit counter-argument acknowledgment, and pristine spoken cadence without fillers or rambling.',
+      };
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: key });
+      const prompt = `You are a championship orator, master debater, and chief communication coach for SpeakUp.
+Your mission: Generate a master-level, 95+ score caliber IDEAL SPOKEN RESPONSE for the following speaking prompt:
+
+TOPIC TITLE: "${params.topic.title}"
+QUESTION / PROMPT: "${params.topic.question}"
+PRACTICE MODE: "${params.mode}"
+DIFFICULTY: "${params.difficulty || params.topic.difficulty || 'intermediate'}"
+${weaknessContext}
+
+${params.originalTranscript ? `USER'S ORIGINAL ATTEMPT (FOR CONTRAST & TARGETED IMPROVEMENT):\n"""\n${params.originalTranscript.slice(0, 1000)}\n"""` : ''}
+
+CRITICAL BENCHMARK STANDARDS:
+1. Spoken Pacing: Tailored for a natural 2 to 3 minute oral delivery (~200 to 350 spoken words, ~130-150 WPM).
+2. Spoken Cadence: Use natural conversational transitions, vivid metaphors, active verbs, and rhetorical signposting ("First", "Crucially", "Consider this", "Ultimately").
+3. Unshakable Logic: Present a crisp counter-intuitive thesis, at least two rigorous causal arguments ("why" + real-world evidence), address the strongest counter-argument directly, and close with a punchy synthesis.
+4. Flawless Grammar: Zero awkward phrasing, zero filler words, lexical precision without esoteric jargon.
+
+Respond strictly with valid JSON conforming to this schema:
+{
+  "topicTitle": "${params.topic.title}",
+  "targetDurationSec": 150,
+  "idealTranscript": "The complete, pristine spoken response verbatim, formatted in 3-4 natural speaking paragraphs.",
+  "structureBreakdown": [
+    {
+      "sectionName": "1. Hook & Provocative Thesis",
+      "contentSnippet": "First 1-2 opening sentences",
+      "rhetoricalPurpose": "Captures attention and establishes immediate intellectual point of view."
+    },
+    {
+      "sectionName": "2. Causal Evidence & Concrete Illustration",
+      "contentSnippet": "Body argument snippet",
+      "rhetoricalPurpose": "Demonstrates why this premise holds with empirical/real-world context."
+    },
+    {
+      "sectionName": "3. Conceding the Nuance / Counter-Perspective",
+      "contentSnippet": "Trade-off argument snippet",
+      "rhetoricalPurpose": "Anticipates counterarguments, proving intellectual honesty."
+    },
+    {
+      "sectionName": "4. Memorable Synthesis & Call-to-Thought",
+      "contentSnippet": "Concluding 1-2 sentences",
+      "rhetoricalPurpose": "Leaves a lasting, cohesive impression without merely repeating."
+    }
+  ],
+  "keyTechniquesUsed": [
+    "Antithesis & Contrast Framing",
+    "Concrete Metric-Anchored Illustration",
+    "Direct Counter-Argument Deconstruction"
+  ],
+  "estimatedWpm": 140,
+  "whyThisScoresHigh": "2-3 sentences explaining why this exact response achieves 95+ on content, reasoning, flow, and clarity."
+}`;
+
+      const { text } = await this.executeWithFallback(ai, prompt, true, 0.4);
+      const parsed = JSON.parse(text);
+
+      return {
+        topicTitle: parsed.topicTitle || params.topic.title,
+        targetDurationSec: Number(parsed.targetDurationSec) || 150,
+        idealTranscript: String(parsed.idealTranscript || ''),
+        structureBreakdown: Array.isArray(parsed.structureBreakdown) ? parsed.structureBreakdown : [],
+        keyTechniquesUsed: Array.isArray(parsed.keyTechniquesUsed) ? parsed.keyTechniquesUsed : [],
+        estimatedWpm: Number(parsed.estimatedWpm) || 140,
+        whyThisScoresHigh: String(
+          parsed.whyThisScoresHigh ||
+            'Demonstrates clear thesis, structured causal reasoning, and immaculate cadence.'
+        ),
+      };
+    } catch (err) {
+      console.warn('[Gemini Client] Ideal speech generation API call failed:', err);
+      return {
+        topicTitle: params.topic.title,
+        targetDurationSec: 150,
+        idealTranscript: `When approaching ${params.topic.title.toLowerCase()}, the decisive factor is disciplined execution coupled with clear causal thinking. First, empirical practice confirms that focusing on foundational principles yields exponential dividends over time. For example, consistent structured articulation consistently outperforms hurried improvisation. Furthermore, while skeptics may claim that such structure limits spontaneity, the reality is that mastery of structure is precisely what unlocks effortless confidence. Ultimately, true eloquence is not about verbosity—it is about clarity of thought and intentional delivery.`,
+        structureBreakdown: [
+          {
+            sectionName: '1. Hook & Provocative Thesis',
+            contentSnippet: `When approaching ${params.topic.title.toLowerCase()}, the decisive factor is disciplined execution coupled with clear causal thinking.`,
+            rhetoricalPurpose: 'Directly anchors the premise with authoritative clarity.',
+          },
+          {
+            sectionName: '2. Causal Evidence & Application',
+            contentSnippet:
+              'First, empirical practice confirms that focusing on foundational principles yields exponential dividends over time.',
+            rhetoricalPurpose: 'Offers rationale and grounding for the core argument.',
+          },
+          {
+            sectionName: '3. Nuance & Refutation',
+            contentSnippet:
+              'Furthermore, while skeptics may claim that such structure limits spontaneity, the reality is that mastery of structure is precisely what unlocks effortless confidence.',
+            rhetoricalPurpose: 'Neutralizes common objections.',
+          },
+          {
+            sectionName: '4. Memorable Synthesis',
+            contentSnippet:
+              'Ultimately, true eloquence is not about verbosity—it is about clarity of thought and intentional delivery.',
+            rhetoricalPurpose: 'Delivers a resonant takeaway.',
+          },
+        ],
+        keyTechniquesUsed: [
+          'Parallel Construction',
+          'Pre-emptive Refutation',
+          'Aphoristic Synthesis',
+        ],
+        estimatedWpm: 140,
+        whyThisScoresHigh:
+          'Exhibits structured reasoning, zero filler words, crisp diction, and direct relevance to the prompt.',
       };
     }
   }

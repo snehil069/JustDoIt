@@ -209,6 +209,29 @@ app.post('/api/evaluate', async (req, res) => {
   }
 });
 
+// Ideal Speech Generation (Benchmark 95+ Response)
+app.post('/api/evaluate/ideal-speech', async (req, res) => {
+  try {
+    const { topic, mode, difficulty, originalTranscript, weaknessesToAddress, apiKeyOverride } = req.body;
+    if (!topic || !topic.title) {
+      return res.status(400).json({ error: 'Topic is required for ideal speech synthesis.' });
+    }
+
+    const idealSpeech = await geminiProvider.generateIdealSpeech({
+      topic,
+      mode: mode || 'impromptu',
+      difficulty,
+      originalTranscript,
+      weaknessesToAddress,
+      apiKeyOverride,
+    });
+    res.json(idealSpeech);
+  } catch (err: any) {
+    console.error('Ideal speech generation error:', err);
+    res.status(500).json({ error: err?.message || 'Failed to generate ideal speech' });
+  }
+});
+
 // Debate Turn
 app.post('/api/debate/turn', async (req, res) => {
   try {

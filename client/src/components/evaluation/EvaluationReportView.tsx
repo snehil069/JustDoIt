@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   PracticeSession,
   Topic,
   PracticeMode,
+  IdealSpeech,
 } from '@shared/types/index';
 import {
   ArrowLeft,
@@ -21,7 +22,16 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  Copy,
+  Check,
+  Loader2,
 } from 'lucide-react';
+import { api } from '../../services/api';
+import { piperTts } from '../../services/piperTts';
+import { storageService } from '../../services/storage';
 
 interface EvaluationReportViewProps {
   session: PracticeSession;
@@ -38,6 +48,73 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
   if (!report) return null;
 
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [idealSpeech, setIdealSpeech] = useState<IdealSpeech | null>(report.idealSpeech || null);
+  const [isGeneratingIdealSpeech, setIsGeneratingIdealSpeech] = useState(false);
+  const [isSpeakingIdealSpeech, setIsSpeakingIdealSpeech] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
+  const [idealSpeechError, setIdealSpeechError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      piperTts.stop();
+    };
+  }, []);
+
+  const handleGenerateIdealSpeech = async () => {
+    setIsGeneratingIdealSpeech(true);
+    setIdealSpeechError(null);
+    try {
+      const weaknesses = (report.detailedWeaknesses || report.improvementAreas || []).map((w: any) =>
+        typeof w === 'string' ? w : `${w.title}: ${w.impactOrWhy || ''}`
+      );
+      const res = await api.generateIdealSpeech({
+        topic: session.topic,
+        mode: session.mode,
+        difficulty: session.topic.difficulty,
+        originalTranscript: session.originalTranscript,
+        weaknessesToAddress: weaknesses.slice(0, 4),
+      });
+      setIdealSpeech(res);
+      report.idealSpeech = res;
+      storageService.saveSession({
+        ...session,
+        evaluation: {
+          ...report,
+          idealSpeech: res,
+        },
+      });
+    } catch (err: any) {
+      console.error('Failed to generate ideal speech:', err);
+      setIdealSpeechError(err.message || 'Failed to synthesize ideal speech');
+    } finally {
+      setIsGeneratingIdealSpeech(false);
+    }
+  };
+
+  const handleToggleSpeechPlayback = () => {
+    if (!idealSpeech) return;
+    if (isSpeakingIdealSpeech) {
+      piperTts.stop();
+      setIsSpeakingIdealSpeech(false);
+    } else {
+      setIsSpeakingIdealSpeech(true);
+      piperTts.speak(idealSpeech.idealTranscript, {
+        onEnd: () => setIsSpeakingIdealSpeech(false),
+        onError: () => setIsSpeakingIdealSpeech(false),
+      });
+    }
+  };
+
+  const handleCopyIdealSpeech = async () => {
+    if (!idealSpeech) return;
+    try {
+      await navigator.clipboard.writeText(idealSpeech.idealTranscript);
+      setHasCopied(true);
+      setTimeout(() => setHasCopied(false), 2000);
+    } catch {
+      // fallback
+    }
+  };
 
   const toggleExpand = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -644,7 +721,208 @@ export const EvaluationReportView: React.FC<EvaluationReportViewProps> = ({
         </section>
       )}
 
-      {/* 10. Personal Improvement Plan (Priority 1, 2, 3) */}
+      {/* 10. Master Benchmark Exemplar Speech (Score 95+ Caliber with Piper TTS) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">
+              Benchmark Exemplar Speech
+            </h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#252525] text-white">
+              Score 95+ Caliber
+            </span>
+          </div>
+          <span className="text-xs text-[#666666]">
+            Target Model for Deliberate Practice
+          </span>
+        </div>
+
+        {isGeneratingIdealSpeech ? (
+          <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-8 text-center space-y-3">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#F5F5F4] text-[#252525] animate-spin">
+              <Loader2 className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold text-[#252525]">Synthesizing Benchmark 95+ Spoken Response...</h4>
+              <p className="text-[11px] text-[#666666]">
+                Formulating hook thesis, causal proofs, and counterargument deconstruction via Gemini 3.1 Flash Lite.
+              </p>
+            </div>
+          </div>
+        ) : idealSpeech ? (
+          <div className="bg-[#FFFFFF] rounded-lg border-2 border-[#252525] p-6 lg:p-8 space-y-6">
+            {/* Header with Title, Stats, and Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#E5E5E5] gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-[#252525]" />
+                  <span className="text-xs font-semibold text-[#252525]">
+                    Ideal Spoken Delivery: "{idealSpeech.topicTitle}"
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-[#666666]">
+                  <span>Pacing: <strong className="text-[#252525] font-mono">{idealSpeech.estimatedWpm || 140} WPM</strong></span>
+                  <span>•</span>
+                  <span>Target Duration: <strong className="text-[#252525] font-mono">{Math.floor((idealSpeech.targetDurationSec || 150) / 60)}m {(idealSpeech.targetDurationSec || 150) % 60}s</strong></span>
+                  <span>•</span>
+                  <span>Cadence: <strong className="text-[#252525]">Signposted & Oratorical</strong></span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 flex-wrap">
+                {/* Piper TTS Listen Button */}
+                <button
+                  onClick={handleToggleSpeechPlayback}
+                  className={`inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isSpeakingIdealSpeech
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
+                      : 'bg-[#252525] text-[#FFFFFF] hover:bg-[#3f3f3f]'
+                  }`}
+                >
+                  {isSpeakingIdealSpeech ? (
+                    <>
+                      <VolumeX className="w-3.5 h-3.5" />
+                      <span>Stop Speech</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Listen (Piper TTS)</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Copy Transcript Button */}
+                <button
+                  onClick={handleCopyIdealSpeech}
+                  className="inline-flex items-center space-x-1.5 px-3 py-2 bg-[#FFFFFF] border border-[#E5E5E5] rounded-lg text-xs font-medium text-[#252525] hover:bg-[#F5F5F4] transition-colors"
+                >
+                  {hasCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Speech</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Regenerate Button */}
+                <button
+                  onClick={handleGenerateIdealSpeech}
+                  disabled={isGeneratingIdealSpeech}
+                  className="inline-flex items-center space-x-1 px-2.5 py-2 text-xs text-[#666666] hover:text-[#252525] hover:bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] transition-colors"
+                  title="Regenerate another benchmark response"
+                >
+                  <RotateCcw className={`w-3.5 h-3.5 ${isGeneratingIdealSpeech ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Full Pristine Spoken Transcript */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono uppercase text-[#929292] block">
+                Complete Benchmark Spoken Transcript (Verbatim Delivery)
+              </span>
+              <div className="p-5 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] text-xs sm:text-sm text-[#252525] leading-relaxed whitespace-pre-line font-normal">
+                {idealSpeech.idealTranscript}
+              </div>
+            </div>
+
+            {/* Structural Breakdown (4 Cards) */}
+            {idealSpeech.structureBreakdown && idealSpeech.structureBreakdown.length > 0 && (
+              <div className="space-y-3 pt-1">
+                <span className="text-[10px] font-mono uppercase text-[#929292] block">
+                  Structural & Rhetorical Blueprint (Why the Argument Convinces)
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {idealSpeech.structureBreakdown.map((sec, idx) => (
+                    <div key={idx} className="p-4 bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] space-y-2 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-mono uppercase text-[#929292] font-semibold block">
+                          {sec.sectionName}
+                        </span>
+                        <p className="text-xs text-[#252525] font-mono italic bg-[#F5F5F4] p-2 rounded border border-[#E5E5E5]">
+                          "{sec.contentSnippet}"
+                        </p>
+                      </div>
+                      <p className="text-xs text-[#666666] pt-1">
+                        <strong>Rhetorical Purpose:</strong> {sec.rhetoricalPurpose}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Key Techniques Badges */}
+            {idealSpeech.keyTechniquesUsed && idealSpeech.keyTechniquesUsed.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <span className="text-[10px] font-mono uppercase text-[#929292] block">
+                  Rhetorical Techniques Deployed
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {idealSpeech.keyTechniquesUsed.map((tech, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded-md text-xs font-mono font-medium border border-[#E5E5E5] bg-[#FFFFFF] text-[#252525]"
+                    >
+                      ✓ {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Why This Response Scores 95+ */}
+            {idealSpeech.whyThisScoresHigh && (
+              <div className="p-4 bg-[#F5F5F4] rounded-lg border border-[#E5E5E5] space-y-1">
+                <div className="flex items-center space-x-2 text-xs font-semibold text-[#252525]">
+                  <Award className="w-4 h-4 text-[#252525]" />
+                  <span>Why This Response Scores 95+ on the Rubric</span>
+                </div>
+                <p className="text-xs text-[#666666] leading-relaxed">
+                  {idealSpeech.whyThisScoresHigh}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 lg:p-8 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-[#252525]" />
+                  <span className="text-xs font-semibold text-[#252525]">
+                    Synthesize & Listen to an Ideal Benchmark Speech
+                  </span>
+                </div>
+                <p className="text-xs text-[#666666] max-w-2xl leading-relaxed">
+                  Want to see and hear how a champion orator would deliver this exact topic? Generate a benchmark 95+ score response addressing your specific weaknesses, structured with counterarguments and causal proofs, and listen to it with Piper TTS.
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateIdealSpeech}
+                disabled={isGeneratingIdealSpeech}
+                className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-[#252525] rounded-lg text-xs font-medium text-[#FFFFFF] hover:bg-[#3f3f3f] transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Generate Ideal Speech</span>
+              </button>
+            </div>
+            {idealSpeechError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                {idealSpeechError}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* 11. Personal Improvement Plan (Priority 1, 2, 3) */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-mono uppercase tracking-wider text-[#929292]">

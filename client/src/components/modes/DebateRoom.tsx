@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Topic, PracticeSession, DebateTurn, EvaluationReport } from '@shared/types/index';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { WaveformVisualizer } from '../common/WaveformVisualizer';
 import { api } from '../../services/api';
 import { storageService } from '../../services/storage';
+import { piperTts } from '../../services/piperTts';
 import {
   Users,
   Mic,
@@ -14,6 +15,8 @@ import {
   User,
   Bot,
   ArrowRight,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 
 interface DebateRoomProps {
@@ -37,6 +40,28 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
   const [isAiResponding, setIsAiResponding] = useState(false);
   const [status, setStatus] = useState<'idle' | 'recording' | 'transcribing' | 'processing_turn' | 'finalizing' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [ttsAutoPlay, setTtsAutoPlay] = useState<boolean>(true);
+  const [speakingTurnIndex, setSpeakingTurnIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      piperTts.stop();
+    };
+  }, []);
+
+  const handlePlayOrStopTts = (text: string, turnIndex: number) => {
+    if (speakingTurnIndex === turnIndex && piperTts.isSpeaking()) {
+      piperTts.stop();
+      setSpeakingTurnIndex(null);
+    } else {
+      setSpeakingTurnIndex(turnIndex);
+      piperTts.speak(text, {
+        onStart: () => setSpeakingTurnIndex(turnIndex),
+        onEnd: () => setSpeakingTurnIndex(null),
+        onError: () => setSpeakingTurnIndex(null),
+      });
+    }
+  };
 
   const {
     isRecording,
@@ -122,11 +147,21 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
         timestamp: new Date().toISOString(),
       };
 
+      const newTurnIndex = updatedTurns.length;
       setTurns((prev) => [...prev, aiTurn]);
       setCurrentRound((prev) => prev + 1);
       setStatus('idle');
       setIsAiResponding(false);
       resetTranscript();
+
+      if (ttsAutoPlay && aiResult.aiResponse) {
+        setSpeakingTurnIndex(newTurnIndex);
+        piperTts.speak(aiResult.aiResponse, {
+          onStart: () => setSpeakingTurnIndex(newTurnIndex),
+          onEnd: () => setSpeakingTurnIndex(null),
+          onError: () => setSpeakingTurnIndex(null),
+        });
+      }
     } catch (err: any) {
       console.error('Debate turn error:', err);
       setStatus('idle');
@@ -194,6 +229,22 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => {
+                if (ttsAutoPlay && piperTts.isSpeaking()) piperTts.stop();
+                setTtsAutoPlay(!ttsAutoPlay);
+              }}
+              className={`px-2.5 py-1 rounded text-xs font-mono flex items-center gap-1.5 border transition-colors ${
+                ttsAutoPlay
+                  ? 'bg-[#252525] text-white border-[#252525]'
+                  : 'bg-[#F5F5F4] text-[#666666] border-[#E5E5E5] hover:bg-[#E5E5E5]'
+              }`}
+              title="Toggle Piper Text-To-Speech for opponent rebuttals"
+            >
+              {ttsAutoPlay ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              <span>Piper TTS: {ttsAutoPlay ? 'ON' : 'OFF'}</span>
+            </button>
             <span className="px-2.5 py-1 rounded bg-[#F5F5F4] border border-[#E5E5E5] text-[#252525]">
               Round {currentRound} of {totalRounds}
             </span>
@@ -256,7 +307,33 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
                   {turn.speaker === 'user' ? `You (${userPosition.toUpperCase()})` : `Opponent Counter-Rebuttal`}
                 </span>
               </div>
-              <span className="text-[11px] text-[#929292] font-mono">Round {turn.roundNumber}</span>
+              <div className="flex items-center space-x-2">
+                {turn.speaker === 'ai' && (
+                  <button
+                    type="button"
+                    onClick={() => handlePlayOrStopTts(turn.content, i)}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono border transition-colors ${
+                      speakingTurnIndex === i
+                        ? 'bg-[#252525] text-white border-[#252525]'
+                        : 'border-[#E5E5E5] bg-[#FAFAFA] hover:bg-[#F5F5F4] text-[#252525]'
+                    }`}
+                    title="Read this turn aloud using Piper TTS"
+                  >
+                    {speakingTurnIndex === i ? (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5 text-red-400" />
+                        <span>Stop Speech</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5" />
+                        <span>Listen (Piper TTS)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <span className="text-[11px] text-[#929292] font-mono">Round {turn.roundNumber}</span>
+              </div>
             </div>
 
             <p className="text-xs sm:text-sm text-[#252525] leading-relaxed pt-1">

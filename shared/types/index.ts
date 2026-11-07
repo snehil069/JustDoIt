@@ -240,9 +240,26 @@ export interface EvaluationReport {
   };
   personalizedExercises: PersonalizedExercise[];
   recommendedNextChallenge: RecommendedNextChallenge;
+  idealSpeech?: IdealSpeech;
   isDemoMode: boolean;
   evaluationVersion: string;
   createdAt: string;
+}
+
+export interface IdealSpeechStructure {
+  sectionName: string;
+  contentSnippet: string;
+  rhetoricalPurpose: string;
+}
+
+export interface IdealSpeech {
+  topicTitle: string;
+  targetDurationSec: number;
+  idealTranscript: string;
+  structureBreakdown: IdealSpeechStructure[];
+  keyTechniquesUsed: string[];
+  estimatedWpm: number;
+  whyThisScoresHigh: string;
 }
 
 export interface DebateTurn {

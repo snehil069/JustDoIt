@@ -6,16 +6,16 @@ import {
   AudioDeliveryMetrics,
   DebateTurn,
   InterviewTurn,
+  IdealSpeech,
 } from '../../../../shared/types/index.js';
 import { MultiStageAnalyzer } from '../../../../shared/evaluation/multiStageAnalyzer.js';
 import { config } from '../../config/index.js';
 
-// Prioritized list of active Google Developer API models supporting generateContent
+// Prioritized list of active Google Developer API models supporting generateContent (primary 3.1 lite, fallback 3.5)
 const CANDIDATE_MODELS = [
   'gemini-3.1-flash-lite',
   'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-3.8-flash',
 ];
 
 export class GeminiProvider {
@@ -482,6 +482,87 @@ Respond in JSON:
       nextQuestion: parsed.nextQuestion,
       feedbackOnAnswer: parsed.feedbackOnAnswer,
       starAnalysis: parsed.starAnalysis,
+    };
+  }
+
+  public async generateIdealSpeech(params: {
+    topic: Topic;
+    mode: PracticeMode;
+    difficulty?: string;
+    originalTranscript?: string;
+    weaknessesToAddress?: string[];
+    apiKeyOverride?: string;
+  }): Promise<IdealSpeech> {
+    const ai = this.getClient(params.apiKeyOverride);
+
+    const weaknessContext = params.weaknessesToAddress && params.weaknessesToAddress.length > 0
+      ? `\nPRIORITY DEFICIENCIES TO OVERCOME IN THIS IDEAL MODEL:\n- ${params.weaknessesToAddress.join('\n- ')}\nEnsure this exemplar demonstrates the exact antidote to these errors (e.g. robust causal reasoning, precise grammar, natural transitions, concrete data/examples).`
+      : '';
+
+    const prompt = `You are a championship orator, master debater, and chief communication coach for SpeakUp.
+Your mission: Generate a master-level, 95+ score caliber IDEAL SPOKEN RESPONSE for the following speaking prompt:
+
+TOPIC TITLE: "${params.topic.title}"
+QUESTION / PROMPT: "${params.topic.question}"
+PRACTICE MODE: "${params.mode}"
+DIFFICULTY: "${params.difficulty || params.topic.difficulty || 'intermediate'}"
+${weaknessContext}
+
+${params.originalTranscript ? `USER'S ORIGINAL ATTEMPT (FOR CONTRAST & TARGETED IMPROVEMENT):\n"""\n${params.originalTranscript.slice(0, 1000)}\n"""` : ''}
+
+CRITICAL BENCHMARK STANDARDS:
+1. Spoken Pacing: Tailored for a natural 2 to 3 minute oral delivery (~200 to 350 spoken words, ~130-150 WPM).
+2. Spoken Cadence: Use natural conversational transitions, vivid metaphors, active verbs, and rhetorical signposting ("First", "Crucially", "Consider this", "Ultimately").
+3. Unshakable Logic: Present a crisp counter-intuitive thesis, at least two rigorous causal arguments ("why" + real-world evidence), address the strongest counter-argument directly, and close with a punchy synthesis.
+4. Flawless Grammar: Zero awkward phrasing, zero filler words, lexical precision without esoteric jargon.
+
+Respond strictly with valid JSON conforming to this schema:
+{
+  "topicTitle": "${params.topic.title}",
+  "targetDurationSec": 150,
+  "idealTranscript": "The complete, pristine spoken response verbatim, formatted in 3-4 natural speaking paragraphs.",
+  "structureBreakdown": [
+    {
+      "sectionName": "1. Hook & Provocative Thesis",
+      "contentSnippet": "First 1-2 opening sentences",
+      "rhetoricalPurpose": "Captures attention and establishes immediate intellectual point of view."
+    },
+    {
+      "sectionName": "2. Causal Evidence & Concrete Illustration",
+      "contentSnippet": "Body argument snippet",
+      "rhetoricalPurpose": "Demonstrates why this premise holds with empirical/real-world context."
+    },
+    {
+      "sectionName": "3. Conceding the Nuance / Counter-Perspective",
+      "contentSnippet": "Trade-off argument snippet",
+      "rhetoricalPurpose": "Anticipates counterarguments, proving intellectual honesty."
+    },
+    {
+      "sectionName": "4. Memorable Synthesis & Call-to-Thought",
+      "contentSnippet": "Concluding 1-2 sentences",
+      "rhetoricalPurpose": "Leaves a lasting, cohesive impression without merely repeating."
+    }
+  ],
+  "keyTechniquesUsed": [
+    "Antithesis & Contrast Framing",
+    "Concrete Metric-Anchored Illustration",
+    "Direct Counter-Argument Deconstruction"
+  ],
+  "estimatedWpm": 140,
+  "whyThisScoresHigh": "2-3 sentences explaining why this exact response achieves 95+ on content, reasoning, flow, and clarity."
+}`;
+
+    const { text } = await this.executeWithFallback(ai, prompt, true, 0.4);
+    const parsed = JSON.parse(text);
+
+    return {
+      topicTitle: parsed.topicTitle || params.topic.title,
+      targetDurationSec: Number(parsed.targetDurationSec) || 150,
+      idealTranscript: String(parsed.idealTranscript || ''),
+      structureBreakdown: Array.isArray(parsed.structureBreakdown) ? parsed.structureBreakdown : [],
+      keyTechniquesUsed: Array.isArray(parsed.keyTechniquesUsed) ? parsed.keyTechniquesUsed : [],
+      estimatedWpm: Number(parsed.estimatedWpm) || 140,
+      whyThisScoresHigh: String(parsed.whyThisScoresHigh || 'Demonstrates clear thesis, structured causal reasoning, and immaculate cadence.'),
     };
   }
 }

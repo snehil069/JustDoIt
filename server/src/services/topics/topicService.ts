@@ -164,7 +164,7 @@ Respond strictly with valid JSON with this exact schema:
 }`;
 
       let responseText = '';
-      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash'];
+      const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemini-3.5-flash'];
       for (const model of candidateModels) {
         try {
           const result = await ai.models.generateContent({
