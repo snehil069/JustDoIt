@@ -6,7 +6,7 @@ import {
   PracticeMode,
   Topic,
 } from '@shared/types/index';
-import { api } from '../../services/api';
+import { api, ALL_30_CATEGORIES } from '../../services/api';
 import {
   Sparkles,
   Filter,
@@ -14,6 +14,7 @@ import {
   Play,
   Lightbulb,
   ArrowRight,
+  Search,
 } from 'lucide-react';
 
 interface TopicGeneratorViewProps {
@@ -23,7 +24,8 @@ interface TopicGeneratorViewProps {
 export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
   onStartSession,
 }) => {
-  const [categories, setCategories] = useState<{ id: Category; label: string; description: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: Category; label: string; description: string }[]>(ALL_30_CATEGORIES);
+  const [categorySearch, setCategorySearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'all'>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | 'all'>('all');
   const [selectedFormat, setSelectedFormat] = useState<PromptFormat | 'all'>('all');
@@ -41,9 +43,11 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
   const loadCategories = async () => {
     try {
       const cats = await api.getCategories();
-      setCategories(cats);
+      if (cats && cats.length > 0) {
+        setCategories(cats);
+      }
     } catch (e) {
-      console.warn('Failed to load categories:', e);
+      console.warn('Using default 30 categories:', e);
     }
   };
 
@@ -82,6 +86,11 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
     }
   };
 
+  const filteredCategories = categories.filter((c) =>
+    c.label.toLowerCase().includes(categorySearch.toLowerCase()) ||
+    c.description.toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-24 text-[#252525]">
       {/* Header */}
@@ -90,13 +99,13 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
           <div className="flex items-center space-x-2">
             <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292]">Repository</span>
             <span className="text-[#E5E5E5]">•</span>
-            <span className="text-xs text-[#666666]">100+ Benchmark Prompts</span>
+            <span className="text-xs text-[#666666]">30 Categories · Dynamic AI Synthesis</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
-            Curated Practice Library
+            Curated Practice & Prompt Library
           </h1>
           <p className="text-xs sm:text-sm text-[#666666] max-w-2xl leading-relaxed pt-1">
-            Filter rigorous challenges by dialectical category, difficulty, and format, or synthesize custom scenarios with generative AI.
+            Browse across 30 dialectical categories and three calibrated difficulties, or generate a fresh, original speaking prompt with Gemini AI.
           </p>
         </div>
 
@@ -107,16 +116,26 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
 
       {/* Filter Parameters */}
       <div className="bg-[#FFFFFF] rounded-lg border border-[#E5E5E5] p-6 space-y-5">
-        <div className="flex items-center space-x-2 text-xs font-mono uppercase tracking-wider text-[#929292]">
-          <Filter className="w-3.5 h-3.5 text-[#252525]" />
-          <span>Analytical Parameters</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs font-mono uppercase tracking-wider text-[#929292]">
+            <Filter className="w-3.5 h-3.5 text-[#252525]" />
+            <span>Select Category ({categories.length} Topics Available)</span>
+          </div>
+
+          <div className="relative w-48 sm:w-64">
+            <Search className="w-3.5 h-3.5 text-[#929292] absolute left-2.5 top-2.5" />
+            <input
+              type="text"
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              placeholder="Search categories..."
+              className="w-full pl-8 pr-3 py-1 text-xs bg-[#FAFAFA] border border-[#E5E5E5] rounded focus:outline-none focus:border-[#252525]"
+            />
+          </div>
         </div>
 
         {/* Category Pills */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-[#252525] block">
-            Category
-          </label>
+        <div className="max-h-48 overflow-y-auto pr-1">
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => {
@@ -131,13 +150,14 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
             >
               All Categories
             </button>
-            {categories.map((c) => (
+            {filteredCategories.map((c) => (
               <button
                 key={c.id}
                 onClick={() => {
                   setSelectedCategory(c.id);
                   fetchNextTopic();
                 }}
+                title={c.description}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   selectedCategory === c.id
                     ? 'bg-[#252525] text-[#FFFFFF]'
@@ -151,14 +171,14 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
         </div>
 
         {/* Sub-parameters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-[#E5E5E5]">
           {/* Difficulty */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-[#252525] block">
               Complexity Level
             </label>
             <div className="flex rounded-lg border border-[#E5E5E5] bg-[#F5F5F4] p-1 text-xs">
-              {(['all', 'easy', 'medium', 'hard'] as const).map((d) => (
+              {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((d) => (
                 <button
                   key={d}
                   onClick={() => setSelectedDifficulty(d)}
@@ -185,8 +205,8 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
               className="w-full py-2 px-3 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] text-xs text-[#252525] font-medium focus:outline-none focus:border-[#252525]"
             >
               <option value="all">Any Format</option>
-              <option value="random-word">Random Word Challenge</option>
               <option value="open-question">Open-Ended Question</option>
+              <option value="random-word">Random Word Challenge</option>
               <option value="hypothetical-situation">Hypothetical Situation</option>
             </select>
           </div>
@@ -194,7 +214,7 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
           {/* Practice Mode */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-[#252525] block">
-              Training Mode Destination
+              Practice Mode Destination
             </label>
             <select
               value={selectedMode}
@@ -247,7 +267,7 @@ export const TopicGeneratorView: React.FC<TopicGeneratorViewProps> = ({
                 className="px-3.5 py-1.5 rounded-lg border border-[#252525] bg-[#252525] hover:bg-[#3f3f3f] text-[#FFFFFF] text-xs font-medium flex items-center space-x-1.5 transition-colors"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isAiGenerating ? 'animate-spin' : ''}`} />
-                <span>AI Synthesize</span>
+                <span>Generate Another Topic</span>
               </button>
             </div>
           </div>

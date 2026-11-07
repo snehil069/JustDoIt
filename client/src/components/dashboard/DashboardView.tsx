@@ -20,6 +20,7 @@ interface DashboardViewProps {
   dailyChallenge: Topic | null;
   onStartPractice: (mode: PracticeMode, topic?: Topic) => void;
   onNavigate: (view: string) => void;
+  onRefreshDailyChallenge?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -27,6 +28,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   dailyChallenge,
   onStartPractice,
   onNavigate,
+  onRefreshDailyChallenge,
 }) => {
   const formatTime = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
@@ -166,18 +168,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => onStartPractice('impromptu', dailyChallenge || undefined)}
             className="inline-flex items-center justify-center px-6 py-2.5 bg-[#252525] hover:bg-[#3a3a3a] text-white text-sm font-medium tracking-tight rounded transition-colors"
           >
             Accept Challenge
           </button>
+          {onRefreshDailyChallenge && (
+            <button
+              onClick={onRefreshDailyChallenge}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-[#E5E5E5] text-[#252525] text-sm font-medium tracking-tight rounded hover:bg-[#F5F5F4] transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#252525]" />
+              <span>Generate Another Topic</span>
+            </button>
+          )}
           <button
             onClick={() => onNavigate('topics')}
-            className="inline-flex items-center justify-center px-6 py-2.5 bg-white border border-[#E5E5E5] text-[#252525] text-sm font-medium tracking-tight rounded hover:bg-[#F5F5F4] transition-colors"
+            className="inline-flex items-center justify-center px-5 py-2.5 bg-white border border-[#E5E5E5] text-[#666666] text-sm font-medium tracking-tight rounded hover:bg-[#F5F5F4] transition-colors"
           >
-            Explore Topic Bank
+            Explore 30 Categories
           </button>
         </div>
       </section>

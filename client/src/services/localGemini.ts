@@ -1,6 +1,9 @@
 import { GoogleGenAI } from '@google/genai';
 import {
   Topic,
+  Category,
+  Difficulty,
+  PromptFormat,
   PracticeMode,
   EvaluationReport,
   DebateTurn,
@@ -9,11 +12,12 @@ import {
 } from '@shared/types/index';
 import { storageService } from './storage';
 import { LocalEvaluator } from './localEvaluator';
+import { blobToBase64, convertBlobToWav } from '../utils/audioUtils';
 
 const CANDIDATE_MODELS = [
+  'gemini-3.1-flash-lite',
   'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-3.1-flash-lite',
   'gemini-3.8-flash',
 ];
 
@@ -111,6 +115,166 @@ export class LocalGeminiService {
         error: err?.message || 'Authentication or network error.',
       };
     }
+  }
+
+  /**
+   * Client-side verbatim audio transcription using Gemini multimodal input
+   */
+  public static async transcribeAudio(
+    audioBlob: Blob,
+    apiKeyOverride?: string
+  ): Promise<{ transcript: string; noSpeech?: boolean }> {
+    const key = this.getApiKey(apiKeyOverride);
+    if (!key) {
+      throw new Error('No Gemini API key configured. Please add your key in Settings.');
+    }
+
+    // Convert blob to standard WAV for maximum reliability across browsers
+    const { wavBlob, mimeType, isSilent } = await convertBlobToWav(audioBlob);
+    if (isSilent) {
+      return { transcript: '', noSpeech: true };
+    }
+    const base64Data = await blobToBase64(wavBlob);
+
+    const ai = new GoogleGenAI({ apiKey: key });
+    const prompt = `Transcribe this spoken audio verbatim. Do not summarize, do not correct grammar, do not omit filler words or hesitation marks (such as um, uh, ah, like). If pure silence, non-speech noise, or no audible words are spoken, respond with exactly: [NO_SPEECH_DETECTED]. Return ONLY the plain text of the spoken words.`;
+
+    let lastError: any = null;
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'audio/wav',
+                    data: base64Data,
+                  },
+                },
+                { text: prompt },
+              ],
+            },
+          ],
+        });
+
+        const text = response?.text?.trim() || '';
+        if (text.includes('[NO_SPEECH_DETECTED]') || !text) {
+          return { transcript: '', noSpeech: true };
+        }
+        return { transcript: text, noSpeech: false };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Gemini Client Audio] Model ${model} audio transcription failed:`, err?.message || err);
+      }
+    }
+
+    throw lastError || new Error('All candidate Gemini models failed to transcribe audio.');
+  }
+
+  /**
+   * Client-side dynamic topic generator with anti-repetition memory
+   */
+  public static async generateTopic(params: {
+    category?: Category;
+    difficulty?: Difficulty;
+    format?: PromptFormat;
+    mode?: PracticeMode;
+    recentTopics?: string[];
+    apiKeyOverride?: string;
+  }): Promise<Topic> {
+    const key = this.getApiKey(params.apiKeyOverride);
+    if (!key) {
+      throw new Error('No Gemini API key configured.');
+    }
+
+    const ai = new GoogleGenAI({ apiKey: key });
+    const all30Categories: Category[] = [
+      'technology', 'ai', 'education', 'business', 'science', 'psychology',
+      'society', 'environment', 'sports', 'careers', 'finance', 'philosophy',
+      'history', 'entertainment', 'everyday-life', 'college-life',
+      'communication-personality', 'creative-thinking', 'critical-thinking',
+      'health-wellness', 'politics-governance', 'space-astronomy', 'art-design',
+      'literature-books', 'food-culinary', 'travel-geography', 'relationships-family',
+      'productivity-habits', 'future-foresight', 'urban-smart-cities',
+    ];
+
+    const chosenCategory = params.category || all30Categories[Math.floor(Math.random() * all30Categories.length)];
+    const chosenDifficulty = params.difficulty || 'intermediate';
+    const chosenMode = params.mode || 'impromptu';
+    const chosenFormat = params.format || 'open-question';
+
+    const recentExclusions = (params.recentTopics || []).slice(-30);
+    const antiRepetitionClause = recentExclusions.length > 0
+      ? `\nCRITICAL ANTI-REPETITION CONSTRAINT: Do NOT generate questions similar, identical, or conceptually redundant to any of these recently practiced topics:\n- ${recentExclusions.join('\n- ')}\nGenerate a completely fresh, distinct problem angle or thought experiment.`
+      : '';
+
+    const modeInstructions: Record<PracticeMode, string> = {
+      impromptu: 'Design a high-friction spontaneous speaking challenge that requires the speaker to take a clear stand, present two concrete reasons, and synthesize a cohesive takeaway without prep time.',
+      research: 'Design a topic suitable for a structured 5-minute research-backed presentation requiring empirical examples, policy/tech context, and analytical depth.',
+      debate: 'Design a sharply polarized, balanced debate motion with an obvious tension where both affirmative and opposing sides have compelling moral and practical arguments.',
+      interview: 'Design a demanding behavioral or situational interview prompt requiring the candidate to employ the STAR method (Situation, Task, Action, Result) with measurable impact.',
+      'explain-simply': 'Design a complex, nuanced concept from this category that the speaker must explain clearly using intuitive real-world metaphors, suitable for an intelligent 12-year-old, without jargon.',
+      'real-life': 'Design a high-stakes, realistic interpersonal scenario (e.g. negotiation, delivering difficult feedback, crisis communication, or persuasive stakeholder alignment).',
+    };
+
+    const difficultyGuidelines: Record<string, string> = {
+      beginner: 'Beginner: Accessible, concrete everyday situations. Focused on clear personal expression and straightforward examples.',
+      easy: 'Beginner: Accessible, concrete everyday situations. Focused on clear personal expression and straightforward examples.',
+      intermediate: 'Intermediate: Requires structured reasoning, balancing two competing viewpoints or practical trade-offs.',
+      medium: 'Intermediate: Requires structured reasoning, balancing two competing viewpoints or practical trade-offs.',
+      advanced: 'Advanced: Complex systemic trade-offs, philosophical dilemmas, multi-stakeholder conflicts, or counter-intuitive edge cases.',
+      hard: 'Advanced: Complex systemic trade-offs, philosophical dilemmas, multi-stakeholder conflicts, or counter-intuitive edge cases.',
+    };
+
+    const prompt = `You are the lead curriculum architect for SpeakUp speech platform.
+Generate ONE original, thought-provoking speaking challenge according to these criteria:
+
+- Category: "${chosenCategory}"
+- Target Mode: "${chosenMode}" (${modeInstructions[chosenMode]})
+- Difficulty: "${chosenDifficulty}" (${difficultyGuidelines[chosenDifficulty] || difficultyGuidelines.intermediate})
+- Format: "${chosenFormat}" (Options: "open-question", "random-word", or "hypothetical-situation")
+${antiRepetitionClause}
+
+Rules:
+1. Promote deep critical thinking, trade-offs, and reasoned argumentation.
+2. Avoid generic platitudes and cliches.
+3. Include 3 distinct dialectical angles or hints.
+4. If format is "random-word", provide a provocative word AND a concrete speaking challenge.
+5. If format is "hypothetical-situation", set an immediate realistic role and stakes.
+
+Respond strictly with valid JSON with this exact schema:
+{
+  "id": "gen-${Date.now()}",
+  "title": "Short descriptive title (3-6 words)",
+  "category": "${chosenCategory}",
+  "difficulty": "${chosenDifficulty}",
+  "format": "${chosenFormat}",
+  "question": "The primary prompt the user will read and respond to (1-3 sentences)",
+  "taskExplanation": "1-2 sentences on what good speakers should emphasize",
+  "suggestedDurationSec": 180,
+  "hints": ["Dialectical Angle 1", "Dialectical Angle 2", "Dialectical Angle 3"],
+  "keywords": ["key1", "key2", "key3"],
+  "source": "ai-generated"
+}`;
+
+    const { text } = await this.executeWithFallback(ai, prompt, true, 0.75);
+    const parsed = JSON.parse(text);
+
+    return {
+      id: `ai-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: String(parsed.title),
+      category: (parsed.category as Category) || chosenCategory,
+      difficulty: (parsed.difficulty as Difficulty) || chosenDifficulty,
+      format: (parsed.format as PromptFormat) || chosenFormat,
+      question: String(parsed.question),
+      taskExplanation: parsed.taskExplanation,
+      suggestedDurationSec: Number(parsed.suggestedDurationSec) || 180,
+      hints: Array.isArray(parsed.hints) ? parsed.hints : [],
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+      source: 'ai-generated',
+    };
   }
 
   public static async evaluateSpeech(params: {

@@ -24,6 +24,7 @@ import {
   ArrowRight,
   ShieldAlert,
   X,
+  RefreshCw,
 } from 'lucide-react';
 
 interface PracticeEngineProps {
@@ -32,19 +33,28 @@ interface PracticeEngineProps {
   onEvaluationComplete: (session: PracticeSession) => void;
   onCancel: () => void;
   onSkipTopic?: () => void;
+  onGenerateAnotherTopic?: () => void;
   researchNotes?: string;
 }
 
 export const PracticeEngine: React.FC<PracticeEngineProps> = ({
-  topic,
+  topic: initialTopic,
   mode,
   onEvaluationComplete,
   onCancel,
   onSkipTopic,
+  onGenerateAnotherTopic,
   researchNotes,
 }) => {
+  const [topic, setTopic] = useState<Topic>(initialTopic);
+  const [isGeneratingTopic, setIsGeneratingTopic] = useState<boolean>(false);
+
+  useEffect(() => {
+    setTopic(initialTopic);
+  }, [initialTopic]);
+
   const [sessionState, setSessionState] = useState<
-    'topic_ready' | 'preparing' | 'recording' | 'processing' | 'completed' | 'error'
+    'topic_ready' | 'preparing' | 'recording' | 'transcribing' | 'processing' | 'completed' | 'error'
   >('topic_ready');
 
   const [selectedDurationSec, setSelectedDurationSec] = useState<number>(topic.suggestedDurationSec || 180);
@@ -57,11 +67,15 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   const [customTranscript, setCustomTranscript] = useState<string>('');
   const [isEditingTranscript, setIsEditingTranscript] = useState<boolean>(false);
 
+  // Last recorded audio blob for retry
+  const lastRecordedAudioBlob = useRef<Blob | null>(null);
+
   // Audio & Speech hooks
   const {
     isRecording,
     currentVolume,
     audioUrl,
+    audioBlob,
     micPermissionDenied,
     startRecording,
     stopRecording,
@@ -101,6 +115,11 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   const durationOptions = [60, 120, 180, 300, 600];
 
   useEffect(() => {
+    setSelectedDurationSec(topic.suggestedDurationSec || 180);
+    setRemainingSec(topic.suggestedDurationSec || 180);
+  }, [topic]);
+
+  useEffect(() => {
     setRemainingSec(selectedDurationSec);
   }, [selectedDurationSec]);
 
@@ -120,11 +139,38 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
   const currentWpm = elapsedSec > 4 ? Math.round((wordCount / elapsedSec) * 60) : 0;
   const fillerCount = (effectiveTranscript.match(/\b(um|uh|erm|like|you know|basically|actually)\b/gi) || []).length;
 
+  const handleGenerateAnotherTopicInternal = async () => {
+    if (isGeneratingTopic) return;
+    setIsGeneratingTopic(true);
+    setErrorMessage(null);
+    try {
+      if (onGenerateAnotherTopic) {
+        onGenerateAnotherTopic();
+      } else {
+        const nextTopic = await api.generateAITopic({
+          category: topic.category,
+          difficulty: topic.difficulty,
+          mode,
+        });
+        setTopic(nextTopic);
+      }
+      setSessionState('topic_ready');
+      setCustomTranscript('');
+      setIsEditingTranscript(false);
+      resetTranscript();
+    } catch (err) {
+      console.error('Failed to generate another topic:', err);
+    } finally {
+      setIsGeneratingTopic(false);
+    }
+  };
+
   const handleStartRecording = async () => {
     setErrorMessage(null);
     resetTranscript();
     setCustomTranscript('');
     setIsEditingTranscript(false);
+    lastRecordedAudioBlob.current = null;
 
     const micGranted = await startRecording();
     if (!micGranted) {
@@ -162,15 +208,90 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
     }
 
     stopListening();
-    const audioAnalysis = stopRecording();
-    latestAudioAnalysisRef.current = audioAnalysis;
+    setSessionState('transcribing');
+    setErrorMessage(null);
 
-    setSessionState('processing');
-    await executeEvaluation(audioAnalysis);
-  }, [stopListening, stopRecording]);
+    try {
+      const stopResult = await stopRecording();
+      lastRecordedAudioBlob.current = stopResult.audioBlob;
+      latestAudioAnalysisRef.current = stopResult.audioAnalysis;
 
-  const executeEvaluation = async (audioAnalysis?: AudioAnalysisOutput | null) => {
-    const transcriptToEvaluate = (customTranscript || fullTranscript || latestTranscriptRef.current).trim();
+      // 1. Transcribe audio using Gemini Developer API
+      const result = await api.transcribeAudio(stopResult.audioBlob, stopResult.audioAnalysis.durationSec);
+      const verbatimSpeech = (result.transcript || '').trim();
+
+      if (result.noSpeech || !verbatimSpeech) {
+        setSessionState('error');
+        setErrorMessage(
+          'No audible speech was detected in your recording. Please ensure your microphone is unmuted, speak clearly, and try recording again.'
+        );
+        return;
+      }
+
+      // Display actual spoken words
+      setCustomTranscript(verbatimSpeech);
+      latestTranscriptRef.current = verbatimSpeech;
+
+      // 2. Proceed to evaluation with verified verbatim transcript
+      await executeEvaluation(verbatimSpeech, stopResult.audioAnalysis);
+    } catch (err: any) {
+      console.error('Audio transcription error:', err);
+      // If audio transcription had an issue, fallback to fullTranscript if available or show error with retry
+      const fallbackSpeech = (latestTranscriptRef.current || fullTranscript).trim();
+      if (fallbackSpeech) {
+        setCustomTranscript(fallbackSpeech);
+        await executeEvaluation(fallbackSpeech, latestAudioAnalysisRef.current);
+      } else {
+        setSessionState('error');
+        setErrorMessage(
+          `Audio transcription failed (${err?.message || 'Network error'}). You can click "Retry Transcription" or record again.`
+        );
+      }
+    }
+  }, [stopListening, stopRecording, fullTranscript]);
+
+  const handleRetryTranscription = async () => {
+    if (!lastRecordedAudioBlob.current) {
+      setErrorMessage('No recorded audio available to retry.');
+      return;
+    }
+
+    try {
+      setSessionState('transcribing');
+      setErrorMessage(null);
+
+      const result = await api.transcribeAudio(lastRecordedAudioBlob.current, elapsedSec);
+      const verbatimSpeech = (result.transcript || '').trim();
+
+      if (result.noSpeech || !verbatimSpeech) {
+        setSessionState('error');
+        setErrorMessage(
+          'No audible speech was detected in this recording. Please try speaking again.'
+        );
+        return;
+      }
+
+      setCustomTranscript(verbatimSpeech);
+      latestTranscriptRef.current = verbatimSpeech;
+
+      await executeEvaluation(verbatimSpeech, latestAudioAnalysisRef.current);
+    } catch (err: any) {
+      console.error('Retry transcription error:', err);
+      setSessionState('error');
+      setErrorMessage(`Retry failed: ${err?.message || 'Error transcribing audio.'}`);
+    }
+  };
+
+  const executeEvaluation = async (
+    transcriptOverride?: string,
+    audioAnalysis?: AudioAnalysisOutput | null
+  ) => {
+    const transcriptToEvaluate = (
+      transcriptOverride ||
+      customTranscript ||
+      fullTranscript ||
+      latestTranscriptRef.current
+    ).trim();
 
     if (!transcriptToEvaluate) {
       setSessionState('error');
@@ -184,9 +305,10 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
       setSessionState('processing');
       const settings = storageService.getSettings();
 
-      const calculatedDuration = elapsedSec > 5 
-        ? elapsedSec 
-        : Math.max(20, Math.round((transcriptToEvaluate.split(/\s+/).filter(Boolean).length / 130) * 60));
+      const calculatedDuration =
+        elapsedSec > 5
+          ? elapsedSec
+          : Math.max(20, Math.round((transcriptToEvaluate.split(/\s+/).filter(Boolean).length / 130) * 60));
 
       const report: EvaluationReport = await api.evaluateSpeech({
         sessionId: currentSessionIdRef.current,
@@ -278,17 +400,25 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
             <div className="flex items-center gap-2.5">
               <span
                 className={`w-2 h-2 rounded-full ${
-                  sessionState === 'recording' ? 'bg-[#252525] pulse-dot' : 'bg-[#929292]'
+                  sessionState === 'recording'
+                    ? 'bg-[#252525] pulse-dot'
+                    : sessionState === 'transcribing'
+                    ? 'bg-[#252525] animate-ping'
+                    : 'bg-[#929292]'
                 }`}
               />
               <span className="text-xs font-semibold tracking-tight text-[#252525]">
                 {sessionState === 'recording'
                   ? 'Recording · Microphone Active'
+                  : sessionState === 'transcribing'
+                  ? 'Transcribing Audio...'
+                  : sessionState === 'processing'
+                  ? 'Analyzing Speech...'
                   : 'Ready to Record'}
               </span>
               <span className="text-[#E5E5E5]">|</span>
               <span className="text-[11px] font-mono text-[#666666] bg-[#FAFAFA] border border-[#E5E5E5] px-2 py-0.5 rounded">
-                Deepgram Nova-2 STT
+                Gemini Developer Audio Engine
               </span>
             </div>
 
@@ -308,8 +438,8 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
             </div>
           </div>
 
-          {/* Thin Linear Progress Bar */}
-          <div className="w-full bg-[#E5E5E5] h-[2px] rounded-full overflow-hidden">
+          {/* Minimal hairline progress indicator */}
+          <div className="w-full bg-[#F5F5F4] h-0.5 rounded-full overflow-hidden">
             <div
               className="bg-[#252525] h-full transition-all duration-300"
               style={{ width: `${sessionState === 'recording' ? Math.min(100, timerProgress) : 0}%` }}
@@ -319,18 +449,31 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
 
         {/* Topic & Prompt Section */}
         <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-[10px] font-mono uppercase tracking-widest text-[#929292] font-medium">
               DAILY RHETORIC DRILL · SPONTANEOUS SYNTHESIS
             </span>
-            {sessionState === 'topic_ready' && onSkipTopic && (
-              <button
-                onClick={onSkipTopic}
-                className="text-[11px] text-[#666666] hover:text-[#252525] hover:underline"
-              >
-                Skip this challenge
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {sessionState === 'topic_ready' && (
+                <button
+                  type="button"
+                  onClick={handleGenerateAnotherTopicInternal}
+                  disabled={isGeneratingTopic}
+                  className="px-2.5 py-1 rounded border border-[#E5E5E5] bg-[#FAFAFA] hover:bg-[#F5F5F4] text-xs text-[#252525] font-medium flex items-center space-x-1.5 transition-colors"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 text-[#252525] ${isGeneratingTopic ? 'animate-spin' : ''}`} />
+                  <span>Generate Another Topic</span>
+                </button>
+              )}
+              {sessionState === 'topic_ready' && onSkipTopic && (
+                <button
+                  onClick={onSkipTopic}
+                  className="text-[11px] text-[#666666] hover:text-[#252525] hover:underline"
+                >
+                  Skip
+                </button>
+              )}
+            </div>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#252525]">
@@ -353,7 +496,7 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-[#666666] bg-[#FAFAFA] border border-[#E5E5E5] px-2.5 py-1 rounded">
               <span className="w-1 h-1 rounded-full bg-[#929292]" />
-              AI Cadence Tracking
+              Verbatim Audio STT
             </span>
           </div>
 
@@ -380,50 +523,42 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
           )}
         </section>
 
-        {/* Acoustic Visualizer */}
-        <section className="flex flex-col gap-2 pt-1 pb-1">
-          <div className="flex items-center justify-between text-[11px] font-mono text-[#929292]">
-            <span>VOICE FREQUENCY SPECTRUM</span>
-            <span>REAL-TIME RMS AUDIO</span>
-          </div>
-          <WaveformVisualizer isRecording={isRecording} volume={currentVolume} barCount={48} />
-        </section>
-
-        {/* Live Speech Transcript Box */}
-        <section className="flex flex-col gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#252525]" />
-              <span className="text-[11px] font-mono uppercase tracking-wider text-[#252525] font-semibold">
-                Live Speech Transcription & Input
-              </span>
+        {/* Real-time Waveform Indicator while recording */}
+        {sessionState === 'recording' && (
+          <div className="border border-[#E5E5E5] rounded p-4 bg-[#FAFAFA] flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs text-[#666666]">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-[#929292]">Audio Signal Level</span>
+              <span className="font-mono text-[11px]">{Math.round(currentVolume * 100)}%</span>
             </div>
+            <WaveformVisualizer isRecording={isRecording} volume={currentVolume} />
+          </div>
+        )}
 
+        {/* Live Audio Ingestion / Transcript Display Area */}
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-[#929292] font-medium">
+              Spoken Transcript (Verbatim Audio Record)
+            </span>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleLoadSampleGrammarMistakes}
-                className="text-[11px] font-mono underline text-[#666666] hover:text-[#252525] transition-colors"
-                title="Loads a prepared response with grammatical errors to instantly test the engine"
+                className="text-[11px] font-medium text-[#252525] hover:underline"
               >
-                + Try Sample Response (With Errors)
+                + Try Sample Response
               </button>
-
               <button
                 type="button"
                 onClick={() => setIsEditingTranscript(!isEditingTranscript)}
-                className="text-[11px] font-mono px-2 py-0.5 rounded border border-[#E5E5E5] text-[#252525] hover:bg-[#F5F5F4] transition-colors"
+                className="text-[11px] font-medium text-[#666666] hover:text-[#252525] underline"
               >
-                {isEditingTranscript ? 'View Live Mode' : 'Edit / Type'}
+                {isEditingTranscript ? 'Done Editing' : 'Edit / Type'}
               </button>
-
-              <span className="text-[11px] font-mono text-[#929292]">
-                {wordCount} words
-              </span>
             </div>
           </div>
 
-          <div className="bg-[#FAFAFA] border border-[#E5E5E5] rounded p-5 flex flex-col justify-between gap-4 min-h-[140px]">
+          <div className="min-h-[140px] bg-[#FAFAFA] border border-[#E5E5E5] rounded p-4 flex flex-col justify-between gap-4">
             {isEditingTranscript ? (
               <textarea
                 value={customTranscript}
@@ -446,8 +581,10 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
                     {!finalTranscript && !interimText && (
                       <span className="text-[#929292] italic">
                         {sessionState === 'recording'
-                          ? 'Listening... Speak clearly into your microphone.'
-                          : 'Transcript will appear here in real-time as you speak. You can also click "+ Try Sample Response" or "Edit / Type" anytime.'}
+                          ? 'Listening and capturing audio... Speak clearly into your microphone.'
+                          : sessionState === 'transcribing'
+                          ? 'Transcribing audio buffer with Gemini...'
+                          : 'Your spoken transcript will appear here verbatim after recording. You can also click "+ Try Sample Response" or "Edit / Type" anytime.'}
                       </span>
                     )}
                   </>
@@ -474,18 +611,34 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
                 </div>
               </div>
 
-              {effectiveTranscript && sessionState !== 'recording' && sessionState !== 'processing' && (
-                <button
-                  type="button"
-                  onClick={() => executeEvaluation(latestAudioAnalysisRef.current)}
-                  className="px-3 py-1 bg-[#252525] hover:bg-[#3a3a3a] text-white rounded text-xs font-sans font-medium transition-colors"
-                >
-                  Analyze This Transcript &rarr;
-                </button>
-              )}
+              {effectiveTranscript &&
+                sessionState !== 'recording' &&
+                sessionState !== 'transcribing' &&
+                sessionState !== 'processing' && (
+                  <button
+                    type="button"
+                    onClick={() => executeEvaluation(effectiveTranscript, latestAudioAnalysisRef.current)}
+                    className="px-3 py-1 bg-[#252525] hover:bg-[#3a3a3a] text-white rounded text-xs font-sans font-medium transition-colors"
+                  >
+                    Analyze This Transcript &rarr;
+                  </button>
+                )}
             </div>
           </div>
         </section>
+
+        {/* Transcribing State Indicator */}
+        {sessionState === 'transcribing' && (
+          <div className="p-6 bg-[#FAFAFA] rounded border border-[#E5E5E5] text-center space-y-3">
+            <Sparkles className="w-5 h-5 text-[#252525] animate-spin mx-auto" />
+            <h4 className="text-sm font-bold text-[#252525]">
+              Transcribing Your Spoken Audio with Gemini AI...
+            </h4>
+            <p className="text-xs text-[#666666] max-w-md mx-auto">
+              Uploading high-fidelity audio buffer and extracting exact spoken words without silent grammar rewrites.
+            </p>
+          </div>
+        )}
 
         {/* Processing State Indicator */}
         {sessionState === 'processing' && (
@@ -500,13 +653,33 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
           </div>
         )}
 
-        {/* Error notification */}
+        {/* Error notification with Retry options */}
         {errorMessage && (
-          <div className="p-4 bg-[#FAFAFA] border border-[#E5E5E5] rounded text-xs text-[#252525] flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-[#929292] mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-bold">Notice</p>
-              <p className="text-[#666666] mt-0.5">{errorMessage}</p>
+          <div className="p-4 bg-[#FAFAFA] border border-[#E5E5E5] rounded text-xs text-[#252525] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-[#929292] mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-bold">Notice</p>
+                <p className="text-[#666666] mt-0.5">{errorMessage}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+              {lastRecordedAudioBlob.current && (
+                <button
+                  type="button"
+                  onClick={handleRetryTranscription}
+                  className="px-3 py-1.5 bg-white border border-[#E5E5E5] hover:bg-[#F5F5F4] text-[#252525] rounded font-medium text-xs transition-colors"
+                >
+                  Retry Transcription
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleStartRecording}
+                className="px-3 py-1.5 bg-[#252525] hover:bg-[#3f3f3f] text-white rounded font-medium text-xs transition-colors"
+              >
+                Record Again
+              </button>
             </div>
           </div>
         )}
@@ -534,9 +707,9 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
               </div>
             )}
 
-            {sessionState === 'error' && (
+            {sessionState === 'error' && !lastRecordedAudioBlob.current && (
               <button
-                onClick={() => executeEvaluation(latestAudioAnalysisRef.current)}
+                onClick={() => executeEvaluation()}
                 className="px-4 py-2 rounded bg-[#252525] text-white text-xs font-medium"
               >
                 Retry Evaluation
@@ -560,8 +733,8 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
                 onClick={handleStopRecording}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#252525] hover:bg-[#151515] text-white text-xs font-medium px-6 py-2.5 rounded transition-colors"
               >
-                <span>Finish & Analyze Response</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <Square className="w-3.5 h-3.5 fill-current" />
+                <span>Finish & Transcribe Response</span>
               </button>
             )}
           </div>

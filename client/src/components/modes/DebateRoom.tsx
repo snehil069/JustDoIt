@@ -35,7 +35,7 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
   const [currentRound, setCurrentRound] = useState<number>(1);
   const [turns, setTurns] = useState<DebateTurn[]>([]);
   const [isAiResponding, setIsAiResponding] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'recording' | 'processing_turn' | 'finalizing' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'transcribing' | 'processing_turn' | 'finalizing' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
@@ -70,12 +70,21 @@ export const DebateRoom: React.FC<DebateRoomProps> = ({
 
   const handleStopSpeaking = async () => {
     stopListening();
-    stopRecording();
+    setStatus('transcribing');
+    setErrorMessage(null);
 
-    const userSpeech = fullTranscript.trim();
+    let userSpeech = '';
+    try {
+      const { audioBlob } = await stopRecording();
+      const result = await api.transcribeAudio(audioBlob);
+      userSpeech = (result.transcript || fullTranscript).trim();
+    } catch {
+      userSpeech = fullTranscript.trim();
+    }
+
     if (!userSpeech) {
       setStatus('idle');
-      setErrorMessage('No speech detected. Please speak your debate argument and try again.');
+      setErrorMessage('No audible speech detected. Please speak your debate argument and try again.');
       return;
     }
 

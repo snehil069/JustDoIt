@@ -145,6 +145,29 @@ export function App() {
     }
   };
 
+  const handleGenerateAnotherTopic = async () => {
+    try {
+      const nextTopic = await api.generateAITopic({
+        mode: activeMode,
+        category: activeTopic?.category,
+        difficulty: activeTopic?.difficulty,
+      });
+      setActiveTopic(nextTopic);
+    } catch (e) {
+      console.warn('Failed to generate fresh AI topic:', e);
+      handleSkipTopic();
+    }
+  };
+
+  const handleRefreshDailyChallenge = async () => {
+    try {
+      const fresh = await api.generateAITopic({ mode: 'impromptu' });
+      setDailyChallenge(fresh);
+    } catch (e) {
+      console.warn('Failed to generate new daily challenge:', e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F5F4] text-[#252525] flex flex-col font-sans selection:bg-[#252525] selection:text-[#FFFFFF]">
       <Navbar
@@ -163,6 +186,7 @@ export function App() {
             dailyChallenge={dailyChallenge}
             onStartPractice={handleStartPractice}
             onNavigate={(view) => setCurrentView(view)}
+            onRefreshDailyChallenge={handleRefreshDailyChallenge}
           />
         )}
 
@@ -185,6 +209,7 @@ export function App() {
                 onEvaluationComplete={handleEvaluationComplete}
                 onCancel={() => setCurrentView('dashboard')}
                 onSkipTopic={handleSkipTopic}
+                onGenerateAnotherTopic={handleGenerateAnotherTopic}
               />
             )}
             {activeMode === 'research' && (

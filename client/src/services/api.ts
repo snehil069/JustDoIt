@@ -12,23 +12,46 @@ import { CURATED_TOPICS } from '@shared/topics/topicBank';
 import { storageService } from './storage';
 import { LocalGeminiService } from './localGemini';
 import { LocalEvaluator } from './localEvaluator';
+import { blobToBase64, convertBlobToWav } from '../utils/audioUtils';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL
   ? `${(import.meta as any).env.VITE_API_URL}/api`
   : '/api';
 
-const DEFAULT_CATEGORIES: { id: Category; label: string; description: string }[] = [
-  { id: 'everyday-life', label: 'Everyday Life', description: 'Daily habits, routines, personal dilemmas, and real-world conversations' },
-  { id: 'college-life', label: 'College & Student Life', description: 'Academics, campus conflicts, peer dynamics, and project coordination' },
-  { id: 'tech-engineering', label: 'Technology & Engineering', description: 'Emerging tech, engineering ethics, sustainable transitions, and real-world application' },
-  { id: 'computer-science', label: 'Computer Science', description: 'Systems, algorithms, open source, AI, and simplifying technical concepts' },
-  { id: 'general-awareness', label: 'General Awareness', description: 'Global developments, geopolitics, media literacy, and scientific understanding' },
-  { id: 'society-affairs', label: 'Society & Current Affairs', description: 'Civic challenges, urbanization, culture, social justice, and policy' },
-  { id: 'communication-personality', label: 'Communication & Personality', description: 'Defending arguments, handling criticism, tact, and confident articulation' },
-  { id: 'career-professional', label: 'Career & Professional Skills', description: 'Interviews, STAR responses, workplace dilemmas, and leadership strategy' },
-  { id: 'creative-thinking', label: 'Creative Thinking', description: 'Unconventional solutions, scenario reimagining, and lateral ideas' },
-  { id: 'critical-thinking', label: 'Critical Thinking & Debate', description: 'Counterarguments, cognitive fallacies, weighing trade-offs, and rigorous logic' },
+export const ALL_30_CATEGORIES: { id: Category; label: string; description: string }[] = [
+  { id: 'technology', label: 'Technology', description: 'Emerging tech, cybersecurity, digital infrastructure, and computing trends' },
+  { id: 'ai', label: 'Artificial Intelligence', description: 'Machine learning, generative AI, automation, ethics, and human-AI collaboration' },
+  { id: 'education', label: 'Education', description: 'Learning methods, educational reform, universities, and skill development' },
+  { id: 'business', label: 'Business & Startups', description: 'Entrepreneurship, strategy, marketing, organizational design, and disruption' },
+  { id: 'science', label: 'Science & Discovery', description: 'Physics, biology, scientific breakthroughs, space exploration, and empirical rigor' },
+  { id: 'psychology', label: 'Psychology & Behavior', description: 'Human behavior, cognitive biases, emotional intelligence, and mental models' },
+  { id: 'society', label: 'Society & Culture', description: 'Cultural shifts, civic issues, demographic changes, and modern social dynamics' },
+  { id: 'environment', label: 'Environment & Climate', description: 'Sustainability, climate change, renewable energy, and ecological balance' },
+  { id: 'sports', label: 'Sports & Competition', description: 'Athletics, high-performance psychology, teamwork, and modern sports industries' },
+  { id: 'careers', label: 'Careers & Leadership', description: 'Professional growth, job transitions, workplace dilemmas, and leadership strategy' },
+  { id: 'finance', label: 'Finance & Economics', description: 'Personal finance, macroeconomic trends, investing, monetary systems, and wealth' },
+  { id: 'philosophy', label: 'Philosophy & Ethics', description: 'Moral dilemmas, existential inquiry, truth, logic, and timeless philosophical ideas' },
+  { id: 'history', label: 'History & Civilization', description: 'Historical turning points, lessons of past empires, leadership triumphs and failures' },
+  { id: 'entertainment', label: 'Media & Entertainment', description: 'Cinema, music, digital creators, video games, storytelling, and culture' },
+  { id: 'everyday-life', label: 'Everyday Life', description: 'Daily habits, personal dilemmas, practical scenarios, and relatable human situations' },
+  { id: 'college-life', label: 'College & Student Life', description: 'Campus conflicts, academic pressure, peer collaboration, and student autonomy' },
+  { id: 'communication-personality', label: 'Communication & Rhetoric', description: 'Persuasion, handling disagreement, active listening, tact, and confident presence' },
+  { id: 'creative-thinking', label: 'Creative & Lateral Thinking', description: 'Unconventional problem-solving, thought experiments, and imaginative ideas' },
+  { id: 'critical-thinking', label: 'Critical Thinking & Logic', description: 'Spotting fallacies, evaluating arguments, balancing trade-offs, and dialectics' },
+  { id: 'health-wellness', label: 'Health & Wellness', description: 'Physical health, nutrition, sleep science, mindfulness, and longevity' },
+  { id: 'politics-governance', label: 'Governance & Policy', description: 'Public policy, civic duties, democratic systems, and institutional reform' },
+  { id: 'space-astronomy', label: 'Space & Astronomy', description: 'Cosmology, Mars missions, astrophysics, space commercialization, and aliens' },
+  { id: 'art-design', label: 'Art, Design & Aesthetics', description: 'Visual arts, architecture, industrial design, UX, and aesthetic theory' },
+  { id: 'literature-books', label: 'Literature & Books', description: 'Great literature, character studies, narrative power, and reading habits' },
+  { id: 'food-culinary', label: 'Food & Culinary Culture', description: 'Gastronomy, food sustainability, culinary heritage, and culinary innovation' },
+  { id: 'travel-geography', label: 'Travel & Global Cultures', description: 'Cross-cultural immersion, geography, global exploration, and travel ethics' },
+  { id: 'relationships-family', label: 'Relationships & Family', description: 'Interpersonal bonds, friendships, conflict resolution, and empathy' },
+  { id: 'productivity-habits', label: 'Productivity & Focus', description: 'Time management, deep work, overcoming procrastination, and habit systems' },
+  { id: 'future-foresight', label: 'Future Foresight', description: 'Megatrends of 2050, transhumanism, future of work, and long-term futures' },
+  { id: 'urban-smart-cities', label: 'Urban Living & Smart Cities', description: 'City design, public transit, housing, smart infrastructure, and urbanism' },
 ];
+
+const DEFAULT_CATEGORIES = ALL_30_CATEGORIES;
 
 /**
  * Robust JSON fetcher that verifies responses are actual JSON (not HTML SPA fallback)
@@ -115,18 +138,96 @@ export const api = {
     mode?: PracticeMode;
   }): Promise<Topic> {
     const settings = storageService.getSettings();
+    const recentSessions = storageService.getSessions();
+    const recentTopics = recentSessions
+      .map((s) => s.topic?.title)
+      .filter((t): t is string => Boolean(t))
+      .slice(-30);
+
     try {
       return await safeFetchJson<Topic>(`${API_BASE}/topics/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...params,
+          recentTopics,
           apiKeyOverride: settings.geminiApiKey || undefined,
         }),
       });
     } catch {
-      // Pick curated topic on error
-      return this.getRandomTopic(params);
+      // Direct client-side AI topic generation fallback
+      try {
+        return await LocalGeminiService.generateTopic({
+          ...params,
+          recentTopics,
+          apiKeyOverride: settings.geminiApiKey || undefined,
+        });
+      } catch {
+        return this.getRandomTopic(params);
+      }
+    }
+  },
+
+  async transcribeAudio(
+    audioBlob: Blob,
+    audioDurationSec?: number
+  ): Promise<{ transcript: string; noSpeech?: boolean; provider?: string }> {
+    const settings = storageService.getSettings();
+
+    // Convert blob to standard WAV, Base64, and detect acoustic silence
+    const { wavBlob, mimeType, isSilent } = await convertBlobToWav(audioBlob);
+
+    // If microphone captured inaudible silence, reject immediately to avoid hallucinated words
+    if (isSilent) {
+      return {
+        transcript: '',
+        noSpeech: true,
+        provider: 'silence-filter',
+      };
+    }
+
+    const audioData = await blobToBase64(wavBlob);
+
+    // 1. Try backend transcription endpoint first
+    try {
+      const result = await safeFetchJson<{
+        transcript: string;
+        noSpeech?: boolean;
+        provider?: string;
+        modelUsed?: string;
+      }>(`${API_BASE}/transcribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioData,
+          mimeType: mimeType || 'audio/wav',
+          apiKeyOverride: settings.geminiApiKey || undefined,
+          preferredSttProvider: settings.preferredSttProvider,
+        }),
+      });
+
+      return {
+        transcript: result.transcript?.trim() || '',
+        noSpeech: result.noSpeech || !result.transcript?.trim(),
+        provider: result.provider || 'gemini',
+      };
+    } catch (apiErr) {
+      console.warn('Backend /api/transcribe unavailable or failed, falling back to direct client Gemini:', apiErr);
+      // 2. Direct client-side Gemini transcription
+      try {
+        const clientResult = await LocalGeminiService.transcribeAudio(
+          wavBlob,
+          settings.geminiApiKey || undefined
+        );
+        return {
+          transcript: clientResult.transcript?.trim() || '',
+          noSpeech: clientResult.noSpeech || !clientResult.transcript?.trim(),
+          provider: 'client-gemini',
+        };
+      } catch (localErr) {
+        console.error('All transcription providers failed:', localErr);
+        throw localErr;
+      }
     }
   },
 

@@ -89,17 +89,102 @@ app.get('/api/topics/random', (req, res) => {
 
 app.post('/api/topics/generate', async (req, res) => {
   try {
-    const { category, difficulty, format, mode, apiKeyOverride } = req.body;
+    const { category, difficulty, format, mode, apiKeyOverride, recentTopics } = req.body;
     const topic = await topicService.generateTopic({
       category,
       difficulty,
       format,
       mode,
       apiKeyOverride,
+      recentTopics,
     });
     res.json(topic);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to generate topic' });
+  }
+});
+
+// Speech-to-Text Transcription via Gemini Multimodal & Deepgram Fallback
+app.post('/api/transcribe', async (req, res) => {
+  try {
+    const { audioData, mimeType, apiKeyOverride, preferredSttProvider } = req.body;
+    if (!audioData) {
+      return res.status(400).json({ error: 'Missing audioData payload' });
+    }
+
+    const effectiveMimeType = mimeType || 'audio/wav';
+
+    // 1. If Deepgram preferred or explicitly requested
+    if (preferredSttProvider === 'deepgram' && (apiKeyOverride || config.deepgramApiKey)) {
+      try {
+        const dgKey = apiKeyOverride || config.deepgramApiKey;
+        const deepgram = createClient(dgKey);
+        const audioBuffer = Buffer.from(audioData, 'base64');
+        const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+          audioBuffer,
+          {
+            model: 'nova-2',
+            smart_format: true,
+            punctuate: true,
+            filler_words: true,
+          }
+        );
+        if (!error && result?.results?.channels?.[0]?.alternatives?.[0]) {
+          const dgTranscript = result.results.channels[0].alternatives[0].transcript?.trim() || '';
+          return res.json({
+            transcript: dgTranscript,
+            noSpeech: !dgTranscript,
+            provider: 'deepgram',
+          });
+        }
+      } catch (dgErr) {
+        console.warn('Deepgram transcribe failed, falling back to Gemini:', dgErr);
+      }
+    }
+
+    // 2. Primary: Gemini Developer API Audio Transcription
+    const geminiResult = await geminiProvider.transcribeAudio({
+      audioData,
+      mimeType: effectiveMimeType,
+      apiKeyOverride,
+    });
+
+    return res.json({
+      transcript: geminiResult.transcript,
+      noSpeech: geminiResult.noSpeech || !geminiResult.transcript.trim(),
+      modelUsed: geminiResult.modelUsed,
+      provider: 'gemini',
+    });
+  } catch (err: any) {
+    console.error('Transcription route error:', err);
+    // Secondary fallback: Deepgram
+    if (config.deepgramApiKey) {
+      try {
+        const deepgram = createClient(config.deepgramApiKey);
+        const audioBuffer = Buffer.from(req.body.audioData, 'base64');
+        const { result, error } = await deepgram.listen.prerecorded.transcribeFile(
+          audioBuffer,
+          {
+            model: 'nova-2',
+            smart_format: true,
+            punctuate: true,
+            filler_words: true,
+          }
+        );
+        if (!error && result?.results?.channels?.[0]?.alternatives?.[0]) {
+          const dgTranscript = result.results.channels[0].alternatives[0].transcript?.trim() || '';
+          return res.json({
+            transcript: dgTranscript,
+            noSpeech: !dgTranscript,
+            provider: 'deepgram-fallback',
+          });
+        }
+      } catch (fallbackErr) {
+        console.error('Deepgram secondary fallback error:', fallbackErr);
+      }
+    }
+
+    res.status(500).json({ error: err?.message || 'Transcription failed' });
   }
 });
 

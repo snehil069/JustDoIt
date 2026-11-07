@@ -34,7 +34,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   );
   const [questionCount, setQuestionCount] = useState<number>(1);
   const maxQuestions = 3;
-  const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'finalizing' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'recording' | 'transcribing' | 'processing' | 'finalizing' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { isRecording, currentVolume, startRecording, stopRecording } = useAudioRecorder();
@@ -57,12 +57,21 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
 
   const handleStopAnswering = async () => {
     stopListening();
-    stopRecording();
+    setStatus('transcribing');
+    setErrorMessage(null);
 
-    const answer = fullTranscript.trim();
+    let answer = '';
+    try {
+      const { audioBlob } = await stopRecording();
+      const result = await api.transcribeAudio(audioBlob);
+      answer = (result.transcript || fullTranscript).trim();
+    } catch {
+      answer = fullTranscript.trim();
+    }
+
     if (!answer) {
       setStatus('idle');
-      setErrorMessage('No speech recorded. Please speak your answer clearly.');
+      setErrorMessage('No audible speech recorded. Please speak your answer clearly.');
       return;
     }
 

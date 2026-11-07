@@ -7,6 +7,12 @@ export interface AudioAnalysisOutput {
   clippingEventsCount: number;
 }
 
+export interface StopRecordingResult {
+  audioBlob: Blob;
+  audioUrl: string;
+  audioAnalysis: AudioAnalysisOutput;
+}
+
 export function useAudioRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -20,6 +26,7 @@ export function useAudioRecorder() {
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const stopResolverRef = useRef<((val: StopRecordingResult) => void) | null>(null);
 
   // Signal processing metrics
   const volumeSeriesRef = useRef<number[]>([]);
@@ -39,6 +46,7 @@ export function useAudioRecorder() {
       silenceIntervalsRef.current = [];
       silenceStartRef.current = null;
       clippingCountRef.current = 0;
+      stopResolverRef.current = null;
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -61,10 +69,18 @@ export function useAudioRecorder() {
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // MediaRecorder setup
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
+      // Determine supported MIME type
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        }
+      }
+
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
 
@@ -79,6 +95,36 @@ export function useAudioRecorder() {
         setAudioBlob(fullBlob);
         const url = URL.createObjectURL(fullBlob);
         setAudioUrl(url);
+
+        const durationSec = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
+
+        // Close any ongoing silence at the end
+        if (silenceStartRef.current !== null) {
+          const pauseDuration = durationSec - silenceStartRef.current;
+          if (pauseDuration >= 0.6) {
+            silenceIntervalsRef.current.push({
+              start: silenceStartRef.current,
+              end: durationSec,
+              duration: Math.round(pauseDuration * 10) / 10,
+            });
+          }
+        }
+
+        const analysis: AudioAnalysisOutput = {
+          durationSec,
+          volumeRmsSeries: [...volumeSeriesRef.current],
+          silenceIntervalsSec: [...silenceIntervalsRef.current],
+          clippingEventsCount: clippingCountRef.current,
+        };
+
+        if (stopResolverRef.current) {
+          stopResolverRef.current({
+            audioBlob: fullBlob,
+            audioUrl: url,
+            audioAnalysis: analysis,
+          });
+          stopResolverRef.current = null;
+        }
       };
 
       recorder.start(250); // Emit chunk every 250ms
@@ -120,7 +166,7 @@ export function useAudioRecorder() {
           clippingCountRef.current += 1;
         }
 
-        // Silence interval tracker (RMS < 0.02)
+        // Silence interval tracker (RMS < 0.025)
         if (rms < 0.025) {
           if (silenceStartRef.current === null) {
             silenceStartRef.current = elapsedSec;
@@ -154,49 +200,59 @@ export function useAudioRecorder() {
     }
   }, []);
 
-  const stopRecording = useCallback((): AudioAnalysisOutput => {
-    setIsRecording(false);
-    setCurrentVolume(0);
+  const stopRecording = useCallback((): Promise<StopRecordingResult> => {
+    return new Promise((resolve) => {
+      setIsRecording(false);
+      setCurrentVolume(0);
 
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
 
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-
-    const durationSec = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
-
-    // Close any ongoing silence at the end
-    if (silenceStartRef.current !== null) {
-      const pauseDuration = durationSec - silenceStartRef.current;
-      if (pauseDuration >= 0.6) {
-        silenceIntervalsRef.current.push({
-          start: silenceStartRef.current,
-          end: durationSec,
-          duration: Math.round(pauseDuration * 10) / 10,
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        stopResolverRef.current = resolve;
+        try {
+          recorder.stop();
+        } catch {
+          // If already stopped
+          const fullBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          resolve({
+            audioBlob: fullBlob,
+            audioUrl: URL.createObjectURL(fullBlob),
+            audioAnalysis: {
+              durationSec: Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
+              volumeRmsSeries: [...volumeSeriesRef.current],
+              silenceIntervalsSec: [...silenceIntervalsRef.current],
+              clippingEventsCount: clippingCountRef.current,
+            },
+          });
+        }
+      } else {
+        const fullBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        resolve({
+          audioBlob: fullBlob,
+          audioUrl: chunksRef.current.length ? URL.createObjectURL(fullBlob) : '',
+          audioAnalysis: {
+            durationSec: Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000)),
+            volumeRmsSeries: [...volumeSeriesRef.current],
+            silenceIntervalsSec: [...silenceIntervalsRef.current],
+            clippingEventsCount: clippingCountRef.current,
+          },
         });
       }
-    }
-
-    return {
-      durationSec,
-      volumeRmsSeries: [...volumeSeriesRef.current],
-      silenceIntervalsSec: [...silenceIntervalsRef.current],
-      clippingEventsCount: clippingCountRef.current,
-    };
+    });
   }, []);
 
   return {

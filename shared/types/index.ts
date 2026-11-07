@@ -1,16 +1,49 @@
 export type Category =
+  // Core 30 Categories
+  | 'technology'
+  | 'ai'
+  | 'education'
+  | 'business'
+  | 'science'
+  | 'psychology'
+  | 'society'
+  | 'environment'
+  | 'sports'
+  | 'careers'
+  | 'finance'
+  | 'philosophy'
+  | 'history'
+  | 'entertainment'
   | 'everyday-life'
   | 'college-life'
+  | 'communication-personality'
+  | 'creative-thinking'
+  | 'critical-thinking'
+  | 'health-wellness'
+  | 'politics-governance'
+  | 'space-astronomy'
+  | 'art-design'
+  | 'literature-books'
+  | 'food-culinary'
+  | 'travel-geography'
+  | 'relationships-family'
+  | 'productivity-habits'
+  | 'future-foresight'
+  | 'urban-smart-cities'
+  // Legacy Aliases
   | 'tech-engineering'
   | 'computer-science'
   | 'general-awareness'
   | 'society-affairs'
-  | 'communication-personality'
-  | 'career-professional'
-  | 'creative-thinking'
-  | 'critical-thinking';
+  | 'career-professional';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty =
+  | 'beginner'
+  | 'intermediate'
+  | 'advanced'
+  | 'easy'
+  | 'medium'
+  | 'hard';
 
 export type PromptFormat = 'random-word' | 'open-question' | 'hypothetical-situation';
 
@@ -27,6 +60,7 @@ export type SessionState =
   | 'topic_ready'
   | 'preparing'
   | 'recording'
+  | 'transcribing'
   | 'processing'
   | 'completed'
   | 'error';
@@ -267,7 +301,7 @@ export interface UserProgress {
   grammarImprovementRate: number; // percentage
   averageWpm: number;
   frequentGrammarMistakes: Array<{ pattern: string; count: number }>;
-  categoryBreakdown: Record<Category, { completed: number; avgScore: number }>;
+  categoryBreakdown: Partial<Record<Category, { completed: number; avgScore: number }>>;
   recentWeaknesses: string[];
 }
 

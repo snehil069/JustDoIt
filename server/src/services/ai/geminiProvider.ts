@@ -12,8 +12,9 @@ import { config } from '../../config/index.js';
 
 // Prioritized list of active Google Developer API models supporting generateContent
 const CANDIDATE_MODELS = [
-  'gemini-3.5-flash',
   'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
   'gemini-3.8-flash',
 ];
 
@@ -99,6 +100,71 @@ export class GeminiProvider {
       message: parsed.message || 'Connection verified',
       latencyMs,
     };
+  }
+
+  /**
+   * Verbatim audio speech-to-text using Gemini Developer API multimodal audio ingestion
+   */
+  public async transcribeAudio(params: {
+    audioData: string;
+    mimeType: string;
+    apiKeyOverride?: string;
+  }): Promise<{ transcript: string; modelUsed: string; noSpeech?: boolean }> {
+    // Pre-flight check on WAV buffers: detect inaudible silence or muted microphone
+    if (params.mimeType.includes('wav')) {
+      try {
+        const buf = Buffer.from(params.audioData, 'base64');
+        if (buf.length > 44) {
+          let maxVal = 0;
+          for (let i = 44; i < buf.length - 1; i += 2) {
+            const sample = Math.abs(buf.readInt16LE(i));
+            if (sample > maxVal) maxVal = sample;
+          }
+          if (maxVal < 800) {
+            return { transcript: '', noSpeech: true, modelUsed: 'acoustic-silence-detector' };
+          }
+        }
+      } catch (err) {
+        console.warn('WAV silence check error:', err);
+      }
+    }
+
+    const ai = this.getClient(params.apiKeyOverride);
+
+    const prompt = `Transcribe this spoken audio verbatim. Do not summarize, do not correct grammar, do not omit filler words or hesitation marks (such as um, uh, ah, like). If pure silence, non-speech noise, or no audible words are spoken, respond with exactly: [NO_SPEECH_DETECTED]. Return ONLY the plain text of the spoken words.`;
+
+    let lastError: any = null;
+    for (const model of CANDIDATE_MODELS) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: params.mimeType,
+                    data: params.audioData,
+                  },
+                },
+                { text: prompt },
+              ],
+            },
+          ],
+        });
+
+        const text = response?.text?.trim() || '';
+        if (text.includes('[NO_SPEECH_DETECTED]') || !text) {
+          return { transcript: '', noSpeech: true, modelUsed: model };
+        }
+        return { transcript: text, noSpeech: false, modelUsed: model };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Gemini Audio] Model ${model} audio transcription failed:`, err?.message || err);
+      }
+    }
+
+    throw lastError || new Error('All candidate Gemini models failed to transcribe audio.');
   }
 
   public async evaluateSpeech(params: {
