@@ -221,6 +221,15 @@ export const PracticeEngine: React.FC<PracticeEngineProps> = ({
       const verbatimSpeech = (result.transcript || '').trim();
 
       if (result.noSpeech || !verbatimSpeech) {
+        // If audio transcription returned no speech, but live recognition captured words cleanly, use that
+        const cleanLiveSpeech = (latestTranscriptRef.current || fullTranscript).trim();
+        if (cleanLiveSpeech) {
+          setCustomTranscript(cleanLiveSpeech);
+          latestTranscriptRef.current = cleanLiveSpeech;
+          await executeEvaluation(cleanLiveSpeech, stopResult.audioAnalysis);
+          return;
+        }
+
         setSessionState('error');
         setErrorMessage(
           'No audible speech was detected in your recording. Please ensure your microphone is unmuted, speak clearly, and try recording again.'

@@ -1,6 +1,54 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { storageService } from '../services/storage';
 
+/**
+ * Merges newly recognized speech into an accumulated transcript without
+ * duplicate prefixes, progressive cumulative loops (Android Chrome bug), or stutter echoes.
+ */
+export function mergeTranscripts(existing: string, incoming: string): string {
+  existing = (existing || '').trim();
+  incoming = (incoming || '').trim();
+
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+
+  const existingLower = existing.toLowerCase();
+  const incomingLower = incoming.toLowerCase();
+
+  // 1. If incoming already starts with existing (progressive cumulative expansion from mobile)
+  if (incomingLower.startsWith(existingLower)) {
+    return incoming;
+  }
+
+  // 2. If existing already contains or ends with incoming
+  if (existingLower.endsWith(incomingLower) || existingLower.includes(incomingLower)) {
+    return existing;
+  }
+
+  // 3. Word-level overlap matching (n-gram suffix of existing == prefix of incoming)
+  const existingWords = existing.split(/\s+/);
+  const incomingWords = incoming.split(/\s+/);
+  const maxOverlap = Math.min(existingWords.length, incomingWords.length, 12);
+
+  for (let len = maxOverlap; len > 0; len--) {
+    const existingSuffix = existingWords
+      .slice(-len)
+      .map((w) => w.toLowerCase().replace(/[^a-z0-9]/g, ''))
+      .join(' ');
+    const incomingPrefix = incomingWords
+      .slice(0, len)
+      .map((w) => w.toLowerCase().replace(/[^a-z0-9]/g, ''))
+      .join(' ');
+
+    if (existingSuffix && existingSuffix === incomingPrefix) {
+      return existingWords.concat(incomingWords.slice(len)).join(' ');
+    }
+  }
+
+  // 4. Clean phrase append
+  return `${existing} ${incoming}`;
+}
+
 export function useSpeechRecognition() {
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState('');
@@ -47,27 +95,24 @@ export function useSpeechRecognition() {
       };
 
       recognition.onresult = (event: any) => {
-        let interim = '';
-        let finalizedSegment = '';
+        let currentFinal = '';
+        let currentInterim = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        for (let i = 0; i < event.results.length; ++i) {
           const item = event.results[i];
-          const text = item[0]?.transcript || '';
+          const text = item[0]?.transcript?.trim() || '';
+          if (!text) continue;
           if (item.isFinal) {
-            finalizedSegment += (finalizedSegment ? ' ' : '') + text;
+            currentFinal += (currentFinal ? ' ' : '') + text;
           } else {
-            interim += (interim ? ' ' : '') + text;
+            currentInterim += (currentInterim ? ' ' : '') + text;
           }
         }
 
-        if (finalizedSegment) {
-          setFinalTranscript((prev) => {
-            const trimmed = prev.trim();
-            const addition = finalizedSegment.trim();
-            return trimmed ? `${trimmed} ${addition}` : addition;
-          });
+        if (currentFinal) {
+          setFinalTranscript((prev) => mergeTranscripts(prev, currentFinal));
         }
-        setInterimText(interim);
+        setInterimText(currentInterim);
       };
 
       recognition.onerror = (event: any) => {
@@ -195,7 +240,7 @@ export function useSpeechRecognition() {
     isListening,
     interimText,
     finalTranscript,
-    fullTranscript: `${finalTranscript} ${interimText}`.trim(),
+    fullTranscript: mergeTranscripts(finalTranscript, interimText),
     isSupported,
     recognitionError,
     startListening,
