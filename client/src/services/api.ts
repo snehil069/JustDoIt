@@ -13,6 +13,7 @@ import { CURATED_TOPICS } from '@shared/topics/topicBank';
 import { storageService } from './storage';
 import { LocalGeminiService } from './localGemini';
 import { LocalEvaluator } from './localEvaluator';
+import { DeepgramClientService } from './deepgramService';
 import { blobToBase64, convertBlobToWav } from '../utils/audioUtils';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL
@@ -175,7 +176,7 @@ export const api = {
   ): Promise<{ transcript: string; noSpeech?: boolean; provider?: string }> {
     const settings = storageService.getSettings();
 
-    // Convert blob to standard WAV, Base64, and detect acoustic silence
+    // Convert blob to standard WAV and check acoustic silence
     const { wavBlob, mimeType, isSilent } = await convertBlobToWav(audioBlob);
 
     // If microphone captured inaudible silence, reject immediately to avoid hallucinated words
@@ -187,49 +188,110 @@ export const api = {
       };
     }
 
-    const audioData = await blobToBase64(wavBlob);
+    const preferDeepgram = settings.preferredSttProvider === 'deepgram';
 
-    // 1. Try backend transcription endpoint first
-    try {
-      const result = await safeFetchJson<{
-        transcript: string;
-        noSpeech?: boolean;
-        provider?: string;
-        modelUsed?: string;
-      }>(`${API_BASE}/transcribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioData,
-          mimeType: mimeType || 'audio/wav',
-          apiKeyOverride: settings.geminiApiKey || undefined,
-          preferredSttProvider: settings.preferredSttProvider,
-        }),
-      });
+    // Helper: Direct client Deepgram Nova-2 REST transcription
+    const tryDeepgram = async () => {
+      try {
+        // Try with wavBlob first, then original audioBlob
+        const blobToUse = wavBlob || audioBlob;
+        const dgRes = await DeepgramClientService.transcribeAudio(blobToUse, settings.deepgramApiKey);
+        if (dgRes.transcript && dgRes.transcript.trim()) {
+          return {
+            transcript: dgRes.transcript.trim(),
+            noSpeech: false,
+            provider: 'deepgram-nova2',
+          };
+        }
+      } catch (dgErr) {
+        console.warn('[STT] Direct Deepgram REST error:', dgErr);
+      }
+      return null;
+    };
 
-      return {
-        transcript: result.transcript?.trim() || '',
-        noSpeech: result.noSpeech || !result.transcript?.trim(),
-        provider: result.provider || 'gemini',
-      };
-    } catch (apiErr) {
-      console.warn('Backend /api/transcribe unavailable or failed, falling back to direct client Gemini:', apiErr);
-      // 2. Direct client-side Gemini transcription
+    // Helper: Direct client Gemini 3.1 Flash Lite Multimodal transcription
+    const tryGemini = async () => {
       try {
         const clientResult = await LocalGeminiService.transcribeAudio(
-          wavBlob,
+          wavBlob || audioBlob,
           settings.geminiApiKey || undefined
         );
-        return {
-          transcript: clientResult.transcript?.trim() || '',
-          noSpeech: clientResult.noSpeech || !clientResult.transcript?.trim(),
-          provider: 'client-gemini',
-        };
-      } catch (localErr) {
-        console.error('All transcription providers failed:', localErr);
-        throw localErr;
+        if (clientResult.transcript && clientResult.transcript.trim()) {
+          return {
+            transcript: clientResult.transcript.trim(),
+            noSpeech: false,
+            provider: 'gemini-3.1-flash-lite',
+          };
+        }
+      } catch (geminiErr) {
+        console.warn('[STT] Direct Gemini multimodal transcription error:', geminiErr);
       }
+      return null;
+    };
+
+    // Helper: Backend endpoint if running in fullstack mode
+    const tryBackend = async () => {
+      try {
+        const audioData = await blobToBase64(wavBlob || audioBlob);
+        const result = await safeFetchJson<{
+          transcript: string;
+          noSpeech?: boolean;
+          provider?: string;
+        }>(`${API_BASE}/transcribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioData,
+            mimeType: mimeType || audioBlob.type || 'audio/wav',
+            apiKeyOverride: settings.geminiApiKey || undefined,
+            preferredSttProvider: settings.preferredSttProvider,
+          }),
+        });
+        if (result.transcript && result.transcript.trim()) {
+          return {
+            transcript: result.transcript.trim(),
+            noSpeech: false,
+            provider: result.provider || 'backend',
+          };
+        }
+      } catch {
+        // Expected on static hosting platforms like Vercel
+      }
+      return null;
+    };
+
+    // Resilient Dual-Engine Execution with Automatic Cross-Fallback
+    if (preferDeepgram) {
+      // 1. Try Deepgram Nova-2 (super-fast, optimized for speech)
+      const r1 = await tryDeepgram();
+      if (r1) return r1;
+
+      // 2. Fallback to Gemini Multimodal
+      const r2 = await tryGemini();
+      if (r2) return r2;
+
+      // 3. Fallback to backend
+      const r3 = await tryBackend();
+      if (r3) return r3;
+    } else {
+      // 1. Try Gemini Multimodal
+      const r1 = await tryGemini();
+      if (r1) return r1;
+
+      // 2. Fallback to Deepgram Nova-2
+      const r2 = await tryDeepgram();
+      if (r2) return r2;
+
+      // 3. Fallback to backend
+      const r3 = await tryBackend();
+      if (r3) return r3;
     }
+
+    return {
+      transcript: '',
+      noSpeech: true,
+      provider: 'none',
+    };
   },
 
   async evaluateSpeech(payload: {
@@ -410,5 +472,13 @@ export const api = {
       // Run direct client-side test
       return await LocalGeminiService.testConnection(apiKeyOverride);
     }
+  },
+
+  async testDeepgramConnection(apiKeyOverride?: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    return await DeepgramClientService.testConnection(apiKeyOverride);
   },
 };

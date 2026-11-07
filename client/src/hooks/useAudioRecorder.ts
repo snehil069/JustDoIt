@@ -61,6 +61,13 @@ export function useAudioRecorder() {
       // AudioContext & AnalyserNode for real-time signal analysis
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') {
+        try {
+          await audioCtx.resume();
+        } catch (e) {
+          console.warn('AudioContext resume error on mobile:', e);
+        }
+      }
       audioContextRef.current = audioCtx;
 
       const source = audioCtx.createMediaStreamSource(stream);
@@ -69,19 +76,26 @@ export function useAudioRecorder() {
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Determine supported MIME type
-      let mimeType = 'audio/webm';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          mimeType = 'audio/webm;codecs=opus';
-        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-          mimeType = 'audio/webm';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
+      // Determine supported MIME type across mobile (iOS Safari, Android) and desktop
+      let mimeType = '';
+      if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
+        const candidateTypes = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/mp4',
+          'audio/aac',
+          'audio/ogg;codecs=opus',
+          'audio/wav',
+        ];
+        for (const candidate of candidateTypes) {
+          if (MediaRecorder.isTypeSupported(candidate)) {
+            mimeType = candidate;
+            break;
+          }
         }
       }
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -91,7 +105,8 @@ export function useAudioRecorder() {
       };
 
       recorder.onstop = () => {
-        const fullBlob = new Blob(chunksRef.current, { type: mimeType });
+        const resolvedType = recorder.mimeType || mimeType || 'audio/webm';
+        const fullBlob = new Blob(chunksRef.current, { type: resolvedType });
         setAudioBlob(fullBlob);
         const url = URL.createObjectURL(fullBlob);
         setAudioUrl(url);

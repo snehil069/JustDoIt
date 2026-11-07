@@ -1,19 +1,20 @@
 import { PracticeSession, UserProgress, ProviderSettings, EvaluationReport } from '@shared/types/index';
 import { supabaseService, isSupabaseConfigured } from './supabase';
+import { BUILTIN_API_KEYS } from '../config/builtinKeys';
 
 const SETTINGS_KEY = 'speakup_settings_v1';
 const SESSIONS_KEY = 'speakup_sessions_v1';
 const PROGRESS_KEY = 'speakup_progress_v1';
 
 export const DEFAULT_SETTINGS: ProviderSettings = {
-  geminiApiKey: '',
+  geminiApiKey: BUILTIN_API_KEYS.gemini,
   grokApiKey: '',
-  deepgramApiKey: '',
+  deepgramApiKey: BUILTIN_API_KEYS.deepgram,
   preferredAiProvider: 'gemini',
-  preferredSttProvider: 'browser-webspeech',
+  preferredSttProvider: 'deepgram',
   retainAudioRecordings: true,
   enableLiveTranscription: true,
-  isDemoMode: true, // Defaults to Demo Mode unless API keys are configured
+  isDemoMode: false, // Default to full AI-powered analysis using built-in keys
 };
 
 export const DEFAULT_PROGRESS: UserProgress = {
@@ -44,21 +45,21 @@ export const DEFAULT_PROGRESS: UserProgress = {
 class StorageService {
   public getSettings(): ProviderSettings {
     const env = (import.meta as any).env || {};
-    const envGeminiKey = env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || '';
-    const envDeepgramKey = env.VITE_DEEPGRAM_API_KEY || env.DEEPGRAM_API_KEY || '';
+    const envGeminiKey = env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || BUILTIN_API_KEYS.gemini;
+    const envDeepgramKey = env.VITE_DEEPGRAM_API_KEY || env.DEEPGRAM_API_KEY || BUILTIN_API_KEYS.deepgram;
 
     try {
       const stored = localStorage.getItem(SETTINGS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        const resolvedGemini = parsed.geminiApiKey || envGeminiKey;
-        const resolvedDeepgram = parsed.deepgramApiKey || envDeepgramKey;
+        const resolvedGemini = (parsed.geminiApiKey && parsed.geminiApiKey.trim()) || envGeminiKey;
+        const resolvedDeepgram = (parsed.deepgramApiKey && parsed.deepgramApiKey.trim()) || envDeepgramKey;
         return {
           ...DEFAULT_SETTINGS,
+          ...parsed,
           geminiApiKey: resolvedGemini,
           deepgramApiKey: resolvedDeepgram,
-          ...parsed,
-          isDemoMode: parsed.isDemoMode !== undefined ? parsed.isDemoMode : !resolvedGemini,
+          isDemoMode: parsed.isDemoMode !== undefined && (!resolvedGemini) ? true : Boolean(parsed.isDemoMode && !resolvedGemini),
         };
       }
     } catch (e) {
@@ -68,8 +69,17 @@ class StorageService {
       ...DEFAULT_SETTINGS,
       geminiApiKey: envGeminiKey,
       deepgramApiKey: envDeepgramKey,
-      isDemoMode: !envGeminiKey,
+      isDemoMode: false,
     };
+  }
+
+  public resetToDefaults(): ProviderSettings {
+    try {
+      localStorage.removeItem(SETTINGS_KEY);
+    } catch (e) {
+      console.warn('Failed to remove settings from localStorage:', e);
+    }
+    return this.getSettings();
   }
 
   public saveSettings(settings: Partial<ProviderSettings>): ProviderSettings {

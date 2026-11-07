@@ -14,6 +14,7 @@ import {
 import { storageService } from './storage';
 import { LocalEvaluator } from './localEvaluator';
 import { blobToBase64, convertBlobToWav } from '../utils/audioUtils';
+import { BUILTIN_API_KEYS } from '../config/builtinKeys';
 
 const CANDIDATE_MODELS = [
   'gemini-3.1-flash-lite',
@@ -27,7 +28,9 @@ export class LocalGeminiService {
     const settings = storageService.getSettings();
     if (settings.geminiApiKey && settings.geminiApiKey.trim()) return settings.geminiApiKey.trim();
     const env = (import.meta as any).env || {};
-    return env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || '';
+    const envKey = env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || '';
+    if (envKey && envKey.trim()) return envKey.trim();
+    return BUILTIN_API_KEYS.gemini;
   }
 
   private static async executeWithFallback(

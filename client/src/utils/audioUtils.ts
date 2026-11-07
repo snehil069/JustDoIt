@@ -32,8 +32,9 @@ export function checkAudioSilence(channelData: Float32Array): { isSilent: boolea
   }
 
   const rms = Math.sqrt(sumSquares / len);
-  // Spoken human speech typically has peak > 0.035 and rms > 0.005
-  const isSilent = peak < 0.025 || rms < 0.004;
+  // Spoken human speech on mobile microphones often has lower hardware gain (~0.015).
+  // Only classify as silent if practically flatline zero (both peak < 0.008 and rms < 0.001).
+  const isSilent = peak < 0.008 && rms < 0.001;
   return { isSilent, maxRms: rms, peak };
 }
 
@@ -127,7 +128,44 @@ export async function convertBlobToWav(
     const audioCtx = new AudioCtx();
     try {
       const arrayBuffer = await blob.arrayBuffer();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      const audioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
+        let isResolved = false;
+        try {
+          const res = audioCtx.decodeAudioData(
+            arrayBuffer,
+            (buf) => {
+              if (!isResolved) {
+                isResolved = true;
+                resolve(buf);
+              }
+            },
+            (err) => {
+              if (!isResolved) {
+                isResolved = true;
+                reject(err);
+              }
+            }
+          );
+          if (res && typeof (res as any).then === 'function') {
+            (res as any).then(
+              (buf: AudioBuffer) => {
+                if (!isResolved) {
+                  isResolved = true;
+                  resolve(buf);
+                }
+              },
+              (err: any) => {
+                if (!isResolved) {
+                  isResolved = true;
+                  reject(err);
+                }
+              }
+            );
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
       const { isSilent } = checkAudioSilence(audioBuffer.getChannelData(0));
       const wavBlob = audioBufferToWav(audioBuffer);
       return { wavBlob, mimeType: 'audio/wav', isSilent };

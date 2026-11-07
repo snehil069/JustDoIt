@@ -39,6 +39,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     error?: string;
   } | null>(null);
 
+  const [testingDeepgram, setTestingDeepgram] = useState(false);
+  const [deepgramTestResult, setDeepgramTestResult] = useState<{
+    success?: boolean;
+    message?: string;
+    error?: string;
+  } | null>(null);
+
+  const handleTestDeepgram = async () => {
+    setTestingDeepgram(true);
+    setDeepgramTestResult(null);
+    try {
+      const res = await api.testDeepgramConnection(form.deepgramApiKey || undefined);
+      setDeepgramTestResult(res);
+    } catch (err: any) {
+      setDeepgramTestResult({
+        success: false,
+        error: err?.message || 'Connection test failed',
+      });
+    } finally {
+      setTestingDeepgram(false);
+    }
+  };
+
+  const handleRestoreDefaults = () => {
+    const defaults = storageService.resetToDefaults();
+    setForm({ ...defaults });
+    onUpdateSettings(defaults);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
   const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => {
     try {
       const cfg = JSON.parse(localStorage.getItem('speakup_supabase_v1') || '{}');
@@ -321,24 +352,77 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   Deepgram Console →
                 </a>
               </div>
-              <div className="relative">
-                <input
-                  type={showDeepgramKey ? 'text' : 'password'}
-                  value={form.deepgramApiKey}
-                  onChange={(e) => setForm({ ...form, deepgramApiKey: e.target.value })}
-                  placeholder="Deepgram key..."
-                  className="w-full py-2.5 px-3 pr-10 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showDeepgramKey ? 'text' : 'password'}
+                    value={form.deepgramApiKey}
+                    onChange={(e) => setForm({ ...form, deepgramApiKey: e.target.value })}
+                    placeholder="Deepgram key..."
+                    className="w-full py-2.5 px-3 pr-10 rounded-lg bg-[#F5F5F4] border border-[#E5E5E5] text-xs font-mono text-[#252525] placeholder-[#929292] focus:outline-none focus:border-[#252525]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeepgramKey(!showDeepgramKey)}
+                    className="absolute right-3 top-2.5 text-[#929292] hover:text-[#252525]"
+                  >
+                    {showDeepgramKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setShowDeepgramKey(!showDeepgramKey)}
-                  className="absolute right-3 top-2.5 text-[#929292] hover:text-[#252525]"
+                  onClick={handleTestDeepgram}
+                  disabled={testingDeepgram}
+                  className="px-4 py-2.5 rounded-lg border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F4] text-[#252525] text-xs font-medium flex items-center space-x-1.5 transition-colors self-start whitespace-nowrap"
                 >
-                  {showDeepgramKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <RefreshCw className={`w-3.5 h-3.5 ${testingDeepgram ? 'animate-spin' : ''}`} />
+                  <span>{testingDeepgram ? 'Verifying...' : 'Test Deepgram'}</span>
                 </button>
               </div>
+
+              {deepgramTestResult && (
+                <div
+                  className={`p-3 rounded-lg border text-xs flex items-start space-x-2 animate-fadeIn ${
+                    deepgramTestResult.success
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}
+                >
+                  {deepgramTestResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-0.5">
+                    <span className="font-semibold block">
+                      {deepgramTestResult.success ? 'Deepgram Active' : 'Verification Issue'}
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      {deepgramTestResult.message || deepgramTestResult.error}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
+
+          {/* Quick Restore Built-in Keys */}
+          <div className="pt-2 border-t border-[#E5E5E5] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="space-y-0.5">
+              <span className="text-xs font-medium text-[#252525]">Device Sync & Auto-Setup</span>
+              <p className="text-[11px] text-[#666666]">
+                Reset this browser to the platform's default high-capacity Google and Deepgram credentials.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRestoreDefaults}
+              className="px-3 py-1.5 rounded-lg border border-[#E5E5E5] bg-[#F5F5F4] hover:bg-[#E5E5E5] text-[#252525] text-xs font-mono transition-colors whitespace-nowrap self-start sm:self-auto"
+            >
+              Restore Default Keys
+            </button>
+          </div>
         </div>
 
         {/* 3. Cloud Database & Storage (Supabase) */}
